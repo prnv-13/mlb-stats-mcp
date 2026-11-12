@@ -17,10 +17,9 @@ dependencies = [
     "mcp>=2.3.0,<3",
 ]
 
-# Fill these in after you push to GitHub:
-# [project.urls]
-# Homepage = "https://github.com/<your-username>/mlb-stats-mcp"
-# Issues = "https://github.com/<your-username>/mlb-stats-mcp/issues"
+[project.urls]
+Homepage = "https://github.com/prnv-13/mlb-stats-mcp"
+Issues = "https://github.com/prnv-13/mlb-stats-mcp/issues"
 
 [project.scripts]
 mlb-stats-mcp = "mlb_stats_mcp:main"

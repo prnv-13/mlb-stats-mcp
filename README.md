@@ -6,7 +6,7 @@ scores, standings and league leaders.
 
 It uses the public MLB Stats API (`statsapi.mlb.com`), so there are no API keys or sign-up.
 
-<!-- mcp-name: io.github.YOUR-GITHUB-USERNAME/mlb-stats-mcp -->
+<!-- mcp-name: io.github.prnv-13/mlb-stats-mcp -->
 
 Ask things like:
 
@@ -89,7 +89,7 @@ In Claude.ai, go to Settings → Connectors → Add custom connector and paste t
 ## Development
 
 ```bash
-git clone https://github.com/YOUR-GITHUB-USERNAME/mlb-stats-mcp
+git clone https://github.com/prnv-13/mlb-stats-mcp
 cd mlb-stats-mcp
 uv sync
 
@@ -168,7 +168,7 @@ API from your server's IP address.
   mcp-publisher publish
   ```
   The registry checks that you own the PyPI package by looking for the `mcp-name:` comment near
-  the top of this README. Replace `YOUR-GITHUB-USERNAME` there before you publish to PyPI.
+  the top of this README.
 - **Community lists:** open a PR to
   [awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers), and submit to
   directories such as Smithery, Glama and mcp.so.
