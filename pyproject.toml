@@ -1,0 +1,35 @@
+[project]
+name = "mlb-stats-mcp"
+version = "0.1.0"
+description = "MCP server for MLB stats: players, live games, schedules, standings and league leaders."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+keywords = ["mcp", "mlb", "baseball", "stats", "claude", "llm"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Games/Entertainment",
+    "Intended Audience :: Developers",
+]
+dependencies = [
+    "httpx>=0.28.1",
+    "mcp>=2.3.0,<3",
+]
+
+# Fill these in after you push to GitHub:
+# [project.urls]
+# Homepage = "https://github.com/<your-username>/mlb-stats-mcp"
+# Issues = "https://github.com/<your-username>/mlb-stats-mcp/issues"
+
+[project.scripts]
+mlb-stats-mcp = "mlb_stats_mcp:main"
+
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
