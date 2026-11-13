@@ -22,7 +22,7 @@ Homepage = "https://github.com/prnv-13/mlb-stats-mcp"
 Issues = "https://github.com/prnv-13/mlb-stats-mcp/issues"
 
 [project.scripts]
-mlb-stats-mcp = "mlb_stats_mcp:main"
+mlb-stats-mcp = "mlb_stats_mcp.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.13.7,<0.14.0"]

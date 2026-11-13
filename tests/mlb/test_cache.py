@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from mlb_stats_mcp.cache import TTLCache
+from mlb_stats_mcp.mlb.cache import TTLCache
 
 
 class FakeClock:

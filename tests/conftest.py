@@ -3,13 +3,33 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass, field
 
 import httpx
 import pytest
 
-from mlb_stats_mcp import api
+from mlb_stats_mcp.mlb import MLBClient, set_client
 
 Handler = Callable[[httpx.Request], httpx.Response]
+NO_RETRY_DELAY = 0.0  # keep retry tests instant
+
+
+@dataclass
+class FakeMLB:
+    """A real MLBClient whose HTTP traffic goes to `handler` instead of the internet."""
+
+    handler: Handler
+    requests: list[httpx.Request] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        def recording_handler(request: httpx.Request) -> httpx.Response:
+            self.requests.append(request)
+            return self.handler(request)
+
+        self.client = MLBClient(
+            transport=httpx.MockTransport(recording_handler),
+            retry_base_delay=NO_RETRY_DELAY,
+        )
 
 
 @pytest.fixture
@@ -18,23 +38,13 @@ def anyio_backend() -> str:
 
 
 @pytest.fixture
-def mock_mlb(monkeypatch: pytest.MonkeyPatch):
-    """Install a fake MLB API. Call it with a handler; it returns the list of requests made."""
-    api.cache.clear()
-    monkeypatch.setattr(api, "RETRY_BASE_DELAY", 0.0)
-    requests: list[httpx.Request] = []
+def fake_mlb():
+    """Factory: fake_mlb(handler) builds a FakeMLB and makes the tools use it."""
 
-    def install(handler: Handler) -> list[httpx.Request]:
-        def recording(request: httpx.Request) -> httpx.Response:
-            requests.append(request)
-            return handler(request)
-
-        monkeypatch.setattr(
-            api,
-            "_client",
-            httpx.AsyncClient(base_url=api.BASE_URL, transport=httpx.MockTransport(recording)),
-        )
-        return requests
+    def install(handler: Handler) -> FakeMLB:
+        fake = FakeMLB(handler)
+        set_client(fake.client)
+        return fake
 
     yield install
-    api.cache.clear()
+    set_client(None)

@@ -11,6 +11,8 @@ from collections import OrderedDict
 from collections.abc import Callable, Hashable, Iterator
 from typing import Any
 
+from ..config import Cache
+
 
 class TTLCache:
     """LRU cache whose entries expire `ttl` seconds after they are set.
@@ -20,7 +22,11 @@ class TTLCache:
     - `clock` is injectable so tests can move time forward without sleeping.
     """
 
-    def __init__(self, max_entries: int = 1000, clock: Callable[[], float] = time.monotonic):
+    def __init__(
+        self,
+        max_entries: int = Cache.MAX_ENTRIES,
+        clock: Callable[[], float] = time.monotonic,
+    ):
         if max_entries < 1:
             raise ValueError("max_entries must be at least 1")
         self.max_entries = max_entries

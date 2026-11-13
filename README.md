@@ -104,14 +104,25 @@ Layout:
 
 ```
 src/mlb_stats_mcp/
-  __init__.py   CLI entry point: stdio (default) or --transport http
-  server.py     the MCP tools
-  api.py        async client for statsapi.mlb.com, with retries; sets per-call TTLs
-  cache.py      generic TTL + LRU cache (no HTTP or MLB knowledge)
-tests/                  offline pytest suite (cache, retries, tool behavior)
+  config.py        every constant: URLs, timeouts, cache TTLs, retry policy, limits
+  cli.py           entry point: stdio (default) or --transport http
+  server.py        build_server(): server identity, instructions, tool registration
+  mlb/             data layer, the only code that talks to MLB
+    client.py      MLBClient: caching + retries around HTTP
+    cache.py       TTLCache: generic TTL + LRU cache
+    endpoints.py   API paths
+    errors.py      MLBApiError
+  tools/           the MCP tools, one module per area
+    teams.py  players.py  leaders.py  games.py  standings.py
+    common.py      shared types, annotations, date and season helpers
+tests/             offline pytest suite, mirrors src/ (mlb/, tools/)
 scripts/smoke_test.py   end-to-end test, works on stdio or an HTTP URL
 Dockerfile              for hosting the HTTP version
 ```
+
+Requests flow one way: `cli` → `server` → `tools/*` → `mlb.MLBClient` → statsapi.mlb.com.
+To add a tool, write an async function in the right `tools/` module (type hints and the
+docstring become its schema), then add it to `ALL_TOOLS` in `tools/__init__.py`.
 
 ## Publishing guide
 
