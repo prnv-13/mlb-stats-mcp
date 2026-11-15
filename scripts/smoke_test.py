@@ -53,7 +53,13 @@ CHECKS = [
     Check("get_team_roster", {"team": "Yankees"}),
     Check("get_schedule", {"date": DODGERS_GAME_DATE, "team": "LAD"}),
     Check("get_game", {"game_pk": DODGERS_AT_REDS_GAME_PK}),
+    Check("get_transactions", {"team": "Yankees", "start_date": f"{SEASON}-10-01", "limit": 3}),
+    Check("get_transactions", {"player_id": AARON_JUDGE_ID, "kind": "status_changes", "limit": 2}),
+    Check("get_award_winners", {"award": "mvp", "season": SEASON}),
+    Check("get_award_winners", {"award": "cy_young", "league": "NL", "seasons": 3}),
+    Check("get_player_awards", {"player_id": AARON_JUDGE_ID}),
     Check("get_team_roster", {"team": "Not A Team"}, expect_error=True),
+    Check("get_transactions", {"start_date": "not-a-date"}, expect_error=True),
 ]
 
 

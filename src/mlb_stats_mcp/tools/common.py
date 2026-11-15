@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal
 
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp_types import ToolAnnotations
 
 from ..config import CacheTTL, MLBApi
@@ -17,6 +18,18 @@ GameLogGroup = Literal["hitting", "pitching"]
 StatType = Literal["season", "career", "yearByYear"]
 RosterType = Literal["active", "40Man", "fullSeason"]
 LeagueCode = Literal["AL", "NL", "MLB"]
+# These two mirror the keys of config.Transactions.TYPE_CODES_BY_KIND and
+# config.Awards.IDS_BY_NAME (a test keeps them in sync).
+TransactionKind = Literal[
+    "all", "signings", "trades", "free_agency", "waivers_and_dfa", "releases",
+    "status_changes", "call_ups_and_options",
+]
+AwardName = Literal[
+    "mvp", "cy_young", "rookie_of_the_year", "manager_of_the_year", "comeback_player",
+    "hank_aaron", "silver_slugger", "gold_glove", "platinum_glove", "all_star", "lcs_mvp",
+    "world_series_mvp", "all_star_game_mvp", "roberto_clemente", "all_mlb_first_team",
+    "all_mlb_second_team",
+]  # fmt: skip
 
 # Every tool only reads public data, so clients may call them freely.
 READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=True, idempotentHint=True)
@@ -24,9 +37,22 @@ READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=True, idempotentHin
 ISO_DATE_FORMAT = "%Y-%m-%d"
 
 
+def today_date() -> date:
+    """Today's date in MLB's timezone."""
+    return datetime.now(MLBApi.TIMEZONE).date()
+
+
 def today() -> str:
     """Today's date in MLB's timezone, as YYYY-MM-DD."""
-    return datetime.now(MLBApi.TIMEZONE).strftime(ISO_DATE_FORMAT)
+    return today_date().strftime(ISO_DATE_FORMAT)
+
+
+def parse_date(value: str, argument: str) -> date:
+    """Parse a YYYY-MM-DD tool argument, telling the model which argument was wrong."""
+    try:
+        return datetime.strptime(value, ISO_DATE_FORMAT).date()
+    except ValueError:
+        raise ToolError(f"{argument} must be a date in YYYY-MM-DD format, got '{value}'.") from None
 
 
 def current_season() -> int:

@@ -6,6 +6,7 @@ PEOPLE_SEARCH = "/people/search"
 STATS_LEADERS = "/stats/leaders"
 SCHEDULE = "/schedule"
 STANDINGS = "/standings"
+TRANSACTIONS = "/transactions"
 
 
 def team_roster(team_id: int) -> str:
@@ -26,3 +27,7 @@ def game_linescore(game_pk: int) -> str:
 
 def game_boxscore(game_pk: int) -> str:
     return f"/game/{game_pk}/boxscore"
+
+
+def award_recipients(award_id: str) -> str:
+    return f"/awards/{award_id}/recipients"

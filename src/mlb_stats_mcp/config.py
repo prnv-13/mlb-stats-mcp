@@ -70,7 +70,9 @@ class CacheTTL:
     LIVE_GAME: Final = 15
     TODAYS_SCHEDULE: Final = SECONDS_PER_MINUTE
     CURRENT_SEASON: Final = 5 * SECONDS_PER_MINUTE  # standings, leaders, this season's stats
-    ROSTER: Final = SECONDS_PER_HOUR  # also player bios and past schedules
+    ROSTER: Final = SECONDS_PER_HOUR  # also player bios, past schedules, past transactions
+    RECENT_TRANSACTIONS: Final = 5 * SECONDS_PER_MINUTE  # moves are posted throughout the day
+    AWARDS: Final = SECONDS_PER_HOUR  # new winners are added during awards week each November
     STATIC: Final = SECONDS_PER_DAY  # teams, finished games, past seasons
 
 
@@ -98,3 +100,56 @@ class Limits:
     MAX_LEADERS: Final = 50
     DEFAULT_GAME_LOG_GAMES: Final = 10
     MAX_GAME_LOG_GAMES: Final = 162  # games in a regular season
+    DEFAULT_TRANSACTIONS: Final = 50
+    MAX_TRANSACTIONS: Final = 200
+    DEFAULT_AWARD_SEASONS: Final = 1
+    MAX_AWARD_SEASONS: Final = 100  # MVPs date back to 1931
+
+
+class Transactions:
+    """Roster moves: signings, trades, waivers, injured list and so on."""
+
+    # With no dates given, a team or league-wide search covers the last week.
+    DEFAULT_WINDOW_DAYS: Final = 7
+    # A league-wide search returns ~20 moves a day, so it is limited to one month.
+    # Searches for one team or player can span any range.
+    MAX_LEAGUE_WIDE_WINDOW_DAYS: Final = 31
+
+    # Tool-facing kinds → MLB transaction type codes (see /api/v1/transactionTypes).
+    # Watch out: the API's "DFA" means *declared free agency*; designated for assignment is "DES".
+    TYPE_CODES_BY_KIND: Final[dict[str, frozenset[str]]] = {
+        "signings": frozenset({"SFA", "SGN", "IFA", "NC"}),
+        "trades": frozenset({"TR"}),
+        "free_agency": frozenset({"DFA"}),
+        "waivers_and_dfa": frozenset({"DES", "WA", "CLW", "OUT"}),
+        "releases": frozenset({"REL", "URL"}),
+        "status_changes": frozenset({"SC", "RE"}),  # injured list placements and activations
+        "call_ups_and_options": frozenset({"CU", "OPT", "SE", "CP", "ASG"}),
+    }
+
+
+class Awards:
+    """MLB award ids, keyed by the award names tools accept, then by league code.
+
+    League awards (MVP, Cy Young, ...) have one id per league; awards given across
+    all of MLB (World Series MVP, ...) have a single "MLB" id.
+    """
+
+    IDS_BY_NAME: Final[dict[str, dict[str, str]]] = {
+        "mvp": {"AL": "ALMVP", "NL": "NLMVP"},
+        "cy_young": {"AL": "ALCY", "NL": "NLCY"},
+        "rookie_of_the_year": {"AL": "ALROY", "NL": "NLROY"},
+        "manager_of_the_year": {"AL": "ALMOY", "NL": "NLMOY"},
+        "comeback_player": {"AL": "ALCPOY", "NL": "NLCPOY"},
+        "hank_aaron": {"AL": "ALHAA", "NL": "NLHAA"},
+        "silver_slugger": {"AL": "ALSS", "NL": "NLSS"},
+        "gold_glove": {"AL": "ALGG", "NL": "NLGG"},
+        "platinum_glove": {"AL": "ALPG", "NL": "NLPG"},
+        "all_star": {"AL": "ALAS", "NL": "NLAS"},
+        "lcs_mvp": {"AL": "ALCSMVP", "NL": "NLCSMVP"},
+        "world_series_mvp": {"MLB": "WSMVP"},
+        "all_star_game_mvp": {"MLB": "ASMVP"},
+        "roberto_clemente": {"MLB": "MLBRC"},
+        "all_mlb_first_team": {"MLB": "MLBAFIRST"},
+        "all_mlb_second_team": {"MLB": "MLBSECOND"},
+    }

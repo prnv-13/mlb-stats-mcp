@@ -14,6 +14,7 @@ Ask things like:
 - "Who's pitching for the Dodgers tonight, and what are their ERAs?"
 - "Show me the AL standings and who's leading the wild card."
 - "Top 10 home run hitters in the NL this season."
+- "Who won the Cy Young this year, and who has the Mets signed this offseason?"
 
 ## Tools
 
@@ -29,6 +30,9 @@ Ask things like:
 | `get_team_roster` | Active, 40-man or full-season roster |
 | `get_schedule` | Games for a date or range, with scores and probable pitchers |
 | `get_game` | Line score by inning plus batting and pitching box score |
+| `get_transactions` | Signings, trades, waivers, DFAs, releases, injured list moves and call-ups, by team, player or date range |
+| `get_award_winners` | MVP, Cy Young, Rookie of the Year, Gold Glove, Silver Slugger and more, for one season or many |
+| `get_player_awards` | Every major award a player has won, with the seasons |
 
 Team arguments accept `"Yankees"`, `"NYY"`, `"New York Yankees"` or `"147"`.
 
@@ -42,8 +46,8 @@ fresh one.
 |---|---|
 | Live games | 15 s |
 | Today's schedule | 1 min |
-| Standings, leaders, current-season stats | 5 min |
-| Rosters, player bios | 1 h |
+| Standings, leaders, current-season stats, this week's transactions | 5 min |
+| Rosters, player bios, award winners, past transactions | 1 h |
 | Teams, finished games, past seasons | 24 h |
 
 The cache keeps at most 1,000 entries and evicts the least recently used. Errors are never cached.
@@ -104,7 +108,8 @@ Layout:
 
 ```
 src/mlb_stats_mcp/
-  config.py        every constant: URLs, timeouts, cache TTLs, retry policy, limits
+  config.py        every constant: URLs, timeouts, cache TTLs, retry policy, limits,
+                   transaction type codes, award ids
   cli.py           entry point: stdio (default) or --transport http
   server.py        build_server(): server identity, instructions, tool registration
   mlb/             data layer, the only code that talks to MLB
@@ -114,6 +119,7 @@ src/mlb_stats_mcp/
     errors.py      MLBApiError
   tools/           the MCP tools, one module per area
     teams.py  players.py  leaders.py  games.py  standings.py
+    transactions.py  awards.py
     common.py      shared types, annotations, date and season helpers
 tests/             offline pytest suite, mirrors src/ (mlb/, tools/)
 scripts/smoke_test.py   end-to-end test, works on stdio or an HTTP URL

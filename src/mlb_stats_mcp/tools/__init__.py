@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from mcp.server.mcpserver import MCPServer
 
-from . import games, leaders, players, standings, teams
+from . import awards, games, leaders, players, standings, teams, transactions
 from .common import READ_ONLY
 
 ALL_TOOLS = (
@@ -18,6 +18,9 @@ ALL_TOOLS = (
     games.get_schedule,
     games.get_game,
     standings.get_standings,
+    transactions.get_transactions,
+    awards.get_award_winners,
+    awards.get_player_awards,
 )
 
 
