@@ -10,6 +10,8 @@ from .tools import register_tools
 INSTRUCTIONS = (
     "Live and historical Major League Baseball data from the public MLB Stats API. "
     "Use search_players to turn a name into a player_id before calling player tools. "
+    "get_matchup gives a batter's history against one pitcher, and compare_players puts "
+    "2-5 players side by side. "
     "Team arguments accept a name, nickname, abbreviation or numeric id "
     "(e.g. 'Yankees', 'NYY', 'New York Yankees', '147'). "
     "Seasons default to the current year; during the off-season pass the previous year "

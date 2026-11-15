@@ -19,6 +19,8 @@ from mcp import Client, StdioServerParameters
 SEASON = 2026
 AARON_JUDGE_ID = 592450
 YOSHINOBU_YAMAMOTO_ID = 808967
+TARIK_SKUBAL_ID = 669373
+SHOHEI_OHTANI_ID = 660271
 DODGERS_GAME_DATE = f"{SEASON}-09-15"
 DODGERS_AT_REDS_GAME_PK = 824466
 
@@ -44,6 +46,16 @@ CHECKS = [
         "get_player_game_log",
         {"player_id": YOSHINOBU_YAMAMOTO_ID, "group": "pitching", "season": SEASON, "last_n": 3},
     ),
+    Check("get_matchup", {"batter_id": AARON_JUDGE_ID, "pitcher_id": TARIK_SKUBAL_ID}),
+    Check(
+        "get_matchup",
+        {"batter_id": AARON_JUDGE_ID, "pitcher_id": YOSHINOBU_YAMAMOTO_ID, "include_postseason": True},
+    ),
+    Check("compare_players", {"player_ids": [AARON_JUDGE_ID, SHOHEI_OHTANI_ID], "season": SEASON}),
+    Check(
+        "compare_players",
+        {"player_ids": [AARON_JUDGE_ID, SHOHEI_OHTANI_ID], "stat_type": "career"},
+    ),
     Check("get_league_leaders", {"category": "homeRuns", "season": SEASON, "limit": 3}),
     Check(
         "get_league_leaders",
@@ -60,6 +72,7 @@ CHECKS = [
     Check("get_player_awards", {"player_id": AARON_JUDGE_ID}),
     Check("get_team_roster", {"team": "Not A Team"}, expect_error=True),
     Check("get_transactions", {"start_date": "not-a-date"}, expect_error=True),
+    Check("compare_players", {"player_ids": [AARON_JUDGE_ID]}, expect_error=True),
 ]
 
 

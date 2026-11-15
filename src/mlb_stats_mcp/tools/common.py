@@ -14,7 +14,8 @@ JSON = dict[str, Any]
 
 # Argument types. Literal values become enums in the JSON Schema the model sees.
 StatGroup = Literal["hitting", "pitching", "fielding"]
-GameLogGroup = Literal["hitting", "pitching"]
+HittingOrPitching = Literal["hitting", "pitching"]
+SeasonOrCareer = Literal["season", "career"]
 StatType = Literal["season", "career", "yearByYear"]
 RosterType = Literal["active", "40Man", "fullSeason"]
 LeagueCode = Literal["AL", "NL", "MLB"]

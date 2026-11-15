@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from mcp.server.mcpserver import MCPServer
 
-from . import awards, games, leaders, players, standings, teams, transactions
+from . import awards, games, leaders, matchups, players, standings, teams, transactions
 from .common import READ_ONLY
 
 ALL_TOOLS = (
@@ -14,6 +14,8 @@ ALL_TOOLS = (
     players.get_player_info,
     players.get_player_stats,
     players.get_player_game_log,
+    matchups.get_matchup,
+    matchups.compare_players,
     leaders.get_league_leaders,
     games.get_schedule,
     games.get_game,

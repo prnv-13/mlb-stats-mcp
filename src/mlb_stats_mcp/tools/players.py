@@ -8,7 +8,7 @@ from ..config import CacheTTL, Limits, MLBApi
 from ..mlb import endpoints, get_client
 from .common import (
     JSON,
-    GameLogGroup,
+    HittingOrPitching,
     StatGroup,
     StatType,
     clamp,
@@ -189,7 +189,7 @@ async def get_player_stats(
 
 async def get_player_game_log(
     player_id: int,
-    group: GameLogGroup = "hitting",
+    group: HittingOrPitching = "hitting",
     season: int | None = None,
     last_n: int = Limits.DEFAULT_GAME_LOG_GAMES,
 ) -> JSON:

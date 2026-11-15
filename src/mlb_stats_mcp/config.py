@@ -104,6 +104,30 @@ class Limits:
     MAX_TRANSACTIONS: Final = 200
     DEFAULT_AWARD_SEASONS: Final = 1
     MAX_AWARD_SEASONS: Final = 100  # MVPs date back to 1931
+    MIN_COMPARE_PLAYERS: Final = 2
+    MAX_COMPARE_PLAYERS: Final = 5
+
+
+class GameType:
+    """MLB game type codes, as used by the stats endpoints' gameType parameter."""
+
+    REGULAR_SEASON: Final = "R"
+    POSTSEASON_ROUNDS: Final = ("F", "D", "L", "W")  # wild card, division, LCS, World Series
+    NAMES: Final[dict[str, str]] = {
+        "R": "regular_season",
+        "F": "wild_card",
+        "D": "division_series",
+        "L": "championship_series",
+        "W": "world_series",
+    }
+
+
+class Matchups:
+    """Batter-vs-pitcher history."""
+
+    # Head-to-head numbers swing wildly over a few at-bats. Below this many plate
+    # appearances the tool tells the model the sample is too small to mean much.
+    MIN_MEANINGFUL_PLATE_APPEARANCES: Final = 50
 
 
 class Transactions:

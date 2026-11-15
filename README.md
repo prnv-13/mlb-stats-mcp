@@ -15,6 +15,7 @@ Ask things like:
 - "Show me the AL standings and who's leading the wild card."
 - "Top 10 home run hitters in the NL this season."
 - "Who won the Cy Young this year, and who has the Mets signed this offseason?"
+- "How has Aaron Judge hit against Tarik Skubal?" / "Judge or Ohtani: who had the better 2026?"
 
 ## Tools
 
@@ -24,6 +25,8 @@ Ask things like:
 | `get_player_info` | Bio: age, height, bats/throws, debut, birthplace |
 | `get_player_stats` | Hitting / pitching / fielding, by season, career or year-by-year |
 | `get_player_game_log` | Game-by-game stats, most recent first, for recent form and streaks |
+| `get_matchup` | A batter's career line against one pitcher, total and by season, optional postseason |
+| `compare_players` | 2-5 players side by side for a season or career, with the leader in each stat |
 | `get_league_leaders` | Leaders for any stat category, AL / NL / MLB |
 | `get_standings` | Division standings with games back, streak, run differential |
 | `list_teams` | All 30 teams with ids, league, division, ballpark |
@@ -119,7 +122,7 @@ src/mlb_stats_mcp/
     errors.py      MLBApiError
   tools/           the MCP tools, one module per area
     teams.py  players.py  leaders.py  games.py  standings.py
-    transactions.py  awards.py
+    transactions.py  awards.py  matchups.py
     common.py      shared types, annotations, date and season helpers
 tests/             offline pytest suite, mirrors src/ (mlb/, tools/)
 scripts/smoke_test.py   end-to-end test, works on stdio or an HTTP URL
