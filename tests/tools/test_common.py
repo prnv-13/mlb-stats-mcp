@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from typing import get_args
 
-from mlb_stats_mcp.config import Awards, CacheTTL, Transactions
+from mlb_stats_mcp.config import Awards, CacheTTL, Splits, Transactions
 from mlb_stats_mcp.tools.common import (
     AwardName,
+    SplitCategory,
     TransactionKind,
     clamp,
     current_season,
@@ -36,3 +37,4 @@ def test_past_seasons_are_cached_longer_than_the_current_one():
 def test_literal_argument_types_match_the_config_catalogs():
     assert set(get_args(AwardName)) == set(Awards.IDS_BY_NAME)
     assert set(get_args(TransactionKind)) == {ALL_KINDS, *Transactions.TYPE_CODES_BY_KIND}
+    assert set(get_args(SplitCategory)) == set(Splits.CATEGORIES)

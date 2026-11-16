@@ -17,6 +17,7 @@ Ask things like:
 - "Top 10 home run hitters in the NL this season." / "Who led the Yankees in home runs?"
 - "Who won the Cy Young this year, and who has the Mets signed this offseason?"
 - "How has Aaron Judge hit against Tarik Skubal?" / "Judge or Ohtani: who had the better 2026?"
+- "How does Judge hit against lefties?" / "How does he hit with runners in scoring position?"
 - "Who are the best free agents still available?" / "Where did the Mets' free agents go?"
 - "Who did the Yankees draft in 2026?" / "Who went into the Hall of Fame this year?"
 
@@ -26,7 +27,7 @@ Ask things like:
 |---|---|
 | `search_players` | Name → `player_id`, position, current team |
 | `get_player_info` | Bio: age, height, bats/throws, debut, birthplace |
-| `get_player_stats` | Hitting / pitching / fielding, by season, career or year-by-year; single seasons add WAR, wRC+, wOBA, FIP and xBA / xSLG / xwOBA |
+| `get_player_stats` | Hitting / pitching / fielding, by season, career or year-by-year; single seasons add WAR, wRC+, wOBA, FIP and xBA / xSLG / xwOBA; `split` breaks it down by situation: vs lefties / righties, home / away, month, runners on, count and more |
 | `get_player_game_log` | Game-by-game stats, most recent first, for recent form and streaks |
 | `get_matchup` | A batter's career line against one pitcher, total and by season, optional postseason |
 | `compare_players` | 2-5 players side by side for a season or career, with the leader in each stat (WAR and FIP included for seasons) |

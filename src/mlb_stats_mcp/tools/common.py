@@ -35,8 +35,8 @@ FreeAgentStatus = Literal["available", "signed", "all"]
 Position = Literal[
     "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH", "SP", "RP", "P", "IF", "OF"
 ]  # fmt: skip
-# These two mirror the keys of config.Transactions.TYPE_CODES_BY_KIND and
-# config.Awards.IDS_BY_NAME (a test keeps them in sync).
+# These three mirror the keys of config.Transactions.TYPE_CODES_BY_KIND,
+# config.Awards.IDS_BY_NAME and config.Splits.CATEGORIES (a test keeps them in sync).
 TransactionKind = Literal[
     "all", "signings", "trades", "free_agency", "waivers_and_dfa", "releases",
     "status_changes", "call_ups_and_options",
@@ -47,6 +47,9 @@ AwardName = Literal[
     "world_series_mvp", "all_star_game_mvp", "roberto_clemente", "all_mlb_first_team",
     "all_mlb_second_team", "hall_of_fame",
 ]  # fmt: skip
+SplitCategory = Literal[
+    "handedness", "home_away", "day_night", "month", "situational", "count", "all_star_break"
+]
 
 # Every tool only reads public data, so clients may call them freely.
 READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=True, idempotentHint=True)

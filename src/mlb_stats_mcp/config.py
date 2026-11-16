@@ -172,6 +172,33 @@ class FreeAgency:
     }
 
 
+class Splits:
+    """Situational splits for get_player_stats: category → {MLB situation code: label}.
+
+    Codes come from /api/v1/situationCodes. For a pitcher, vs_left and vs_right mean
+    left- and right-handed batters.
+    """
+
+    CATEGORIES: Final[dict[str, dict[str, str]]] = {
+        "handedness": {"vl": "vs_left", "vr": "vs_right"},
+        "home_away": {"h": "home", "a": "away"},
+        "day_night": {"d": "day", "n": "night"},
+        "month": {
+            "3": "march", "4": "april", "5": "may", "6": "june", "7": "july", "8": "august",
+            "9": "september", "10": "october",
+        },
+        "situational": {
+            "r0": "bases_empty", "ron": "runners_on", "risp": "scoring_position",
+            "risp2": "scoring_position_2_outs", "r123": "bases_loaded", "lc": "late_and_close",
+        },
+        "count": {
+            "fp": "first_pitch", "ac": "ahead_in_count", "bc": "behind_in_count",
+            "2s": "two_strikes",
+        },
+        "all_star_break": {"preas": "before_all_star_break", "posas": "after_all_star_break"},
+    }  # fmt: skip
+
+
 class Awards:
     """MLB award ids, keyed by the award names tools accept, then by league code.
 

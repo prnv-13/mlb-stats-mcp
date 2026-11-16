@@ -81,9 +81,27 @@ CHECKS = [
         "get_player_stats",
         {"player_id": TARIK_SKUBAL_ID, "group": "pitching", "season": SEASON},
     ),
+    Check(
+        "get_player_stats",
+        {"player_id": AARON_JUDGE_ID, "season": SEASON, "split": "handedness"},
+    ),
+    Check(
+        "get_player_stats",
+        {
+            "player_id": TARIK_SKUBAL_ID,
+            "group": "pitching",
+            "stat_type": "career",
+            "split": "month",
+        },
+    ),
     Check("get_team_roster", {"team": "Not A Team"}, expect_error=True),
     Check("get_transactions", {"start_date": "not-a-date"}, expect_error=True),
     Check("compare_players", {"player_ids": [AARON_JUDGE_ID]}, expect_error=True),
+    Check(
+        "get_player_stats",
+        {"player_id": AARON_JUDGE_ID, "group": "fielding", "split": "home_away"},
+        expect_error=True,
+    ),
 ]
 
 

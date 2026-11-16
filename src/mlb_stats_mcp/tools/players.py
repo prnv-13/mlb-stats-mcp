@@ -1,4 +1,4 @@
-"""Player tools: search, biography, season/career stats and game logs."""
+"""Player tools: search, biography, season/career stats, splits and game logs."""
 
 from __future__ import annotations
 
@@ -7,18 +7,20 @@ from typing import Literal
 from mcp.server.mcpserver.exceptions import ToolError
 from typing_extensions import NotRequired, TypedDict
 
-from ..config import CacheTTL, Limits, MLBApi
+from ..config import CacheTTL, Limits, MLBApi, Splits
 from ..mlb import endpoints, get_client
 from . import advanced
 from .common import (
     JSON,
     HittingOrPitching,
+    SplitCategory,
     StatGroup,
     Stats,
     StatType,
     clamp,
     current_season,
     dig,
+    overall_split,
     season_cache_ttl,
     stat_blocks,
 )
@@ -34,6 +36,9 @@ GAME_LOG_FIELDS: dict[str, tuple[str, ...]] = {
         "homeRuns", "numberOfPitches", "wins", "losses", "saves",
     ),
 }  # fmt: skip
+
+# The stats type that breaks each stat_type down by situation.
+SPLIT_STAT_TYPES: dict[str, str] = {"season": "statSplits", "career": "careerStatSplits"}
 
 
 # --------------------------------------------------------------- result types --
@@ -74,8 +79,10 @@ class PlayerBio(TypedDict):
 
 
 class StatLine(TypedDict):
-    """One season or career line. A player traded mid-season has one line per team."""
+    """One season or career line. A player traded mid-season has one line per team, except
+    in splits, which use his combined line."""
 
+    situation: NotRequired[str]  # with split, e.g. "vs_left", "home" or "march"
     season: str | None
     team: str | None
     league: str | None
@@ -88,6 +95,7 @@ class PlayerStats(TypedDict):
     stat_type: StatType
     splits: list[StatLine]
     season: NotRequired[int]
+    split: NotRequired[SplitCategory]
     advanced: NotRequired[Stats]  # single seasons of hitting or pitching only
     note: NotRequired[str]
 
@@ -174,6 +182,19 @@ def _format_game_log_entry(split: JSON, fields: tuple[str, ...]) -> GameLogEntry
     }
 
 
+def _situation_lines(splits: list[JSON], category: SplitCategory) -> list[StatLine]:
+    """One line per situation in the category, in the category's order."""
+    rows_by_code: dict[str, list[JSON]] = {}
+    for split in splits:
+        rows_by_code.setdefault(dig(split, "split", "code"), []).append(split)
+    lines = []
+    for code, situation in Splits.CATEGORIES[category].items():
+        row = overall_split(rows_by_code.get(code, []))  # a traded player's combined line
+        if row:
+            lines.append({"situation": situation, **_format_stat_split(row)})
+    return lines
+
+
 def _all_splits(stats_response: JSON) -> list[JSON]:
     return [split for block in stats_response.get("stats", []) for split in block.get("splits", [])]
 
@@ -230,23 +251,39 @@ async def get_player_stats(
     group: StatGroup = "hitting",
     stat_type: StatType = "season",
     season: int | None = None,
+    split: SplitCategory | None = None,
 ) -> PlayerStats:
     """Get a player's batting, pitching or fielding stats. For one season of hitting or
     pitching it also returns advanced stats: WAR, wRC+, wOBA, FIP, xFIP, ERA-/FIP- and the
     Statcast expected stats xBA, xSLG and xwOBA (for pitchers, what hitters did against them).
+
+    Use split for situational questions such as "how does he hit lefties?", "home or away?"
+    or "with runners in scoring position".
 
     Args:
         player_id: MLB player id from search_players.
         group: "hitting", "pitching" or "fielding".
         stat_type: "season" (one season), "career" (career totals) or "yearByYear" (every season).
         season: Season year for stat_type="season"; defaults to the current one.
+        split: Break the stats down by situation, one line each: "handedness" (vs left- and
+            right-handed pitchers, or batters for a pitcher), "home_away", "day_night",
+            "month", "situational" (bases empty, runners on, scoring position, bases loaded,
+            late and close), "count" (first pitch, ahead, behind, two strikes) or
+            "all_star_break". For hitting or pitching, one season or career.
     """
+    if split and (group == "fielding" or stat_type not in SPLIT_STAT_TYPES):
+        raise ToolError(
+            'split works for group "hitting" or "pitching" with stat_type "season" or "career".'
+        )
     is_single_season = stat_type == "season"
     if is_single_season:
         season = season or current_season()
     # Advanced stats are separate stats types, fetched in the same request.
-    with_advanced = is_single_season and group in advanced.FIELDS
-    stat_types = (stat_type, *advanced.STAT_TYPES) if with_advanced else (stat_type,)
+    with_extras = is_single_season and not split
+    with_advanced = with_extras and group in advanced.FIELDS
+    stat_types = (SPLIT_STAT_TYPES[stat_type] if split else stat_type,)
+    if with_advanced:
+        stat_types += advanced.STAT_TYPES
 
     data = await get_client().get(
         endpoints.person_stats(player_id),
@@ -254,28 +291,37 @@ async def get_player_stats(
             "stats": ",".join(stat_types),
             "group": group,
             "season": season if is_single_season else None,
+            "sitCodes": ",".join(Splits.CATEGORIES[split]) if split else None,
         },
         ttl=season_cache_ttl(season) if is_single_season else CacheTTL.CURRENT_SEASON,
     )
     blocks = stat_blocks(data)
-    splits = [_format_stat_split(split) for split in blocks.get(stat_type, [])]
+    main_splits = blocks.get(stat_types[0], [])
+    lines = (
+        _situation_lines(main_splits, split)
+        if split
+        else [_format_stat_split(row) for row in main_splits]
+    )
 
     result: PlayerStats = {
         "player_id": player_id,
         "group": group,
         "stat_type": stat_type,
-        "splits": splits,
+        "splits": lines,
     }
     if is_single_season:
         result["season"] = season
+    if split:
+        result["split"] = split
     if with_advanced and (advanced_stats := advanced.pick_advanced(blocks, group)):
         result["advanced"] = advanced_stats
-    if not splits:
+    if not lines:
+        found = f"{group} {split} splits" if split else f"{group} stats"
         result["note"] = (
-            f"No {group} stats found. The player may not have played in {season} "
+            f"No {found} found. The player may not have played in {season} "
             "or this stat group may not apply (e.g. pitching stats for a position player)."
             if is_single_season
-            else f"No {group} stats found for this player."
+            else f"No {found} found for this player."
         )
     return result
 

@@ -99,6 +99,58 @@ async def test_advanced_stats_are_only_for_seasons_of_hitting_or_pitching(
     assert fake.requests[0].url.params["stats"] == requested
 
 
+def _situation_row(code: str, team: str | None = None, **stats) -> dict:
+    row = {"season": "2026", "split": {"code": code}, "stat": stats}
+    if team:
+        row["team"] = {"name": team}
+    return row
+
+
+async def test_split_returns_one_line_per_situation_in_order(fake_mlb, call_tool):
+    rows = [
+        _situation_row("vr", "Detroit Tigers", ops=".839"),
+        _situation_row("vl", "Detroit Tigers", ops=".700"),
+        _situation_row("vl", "Los Angeles Dodgers", ops=".800"),
+        _situation_row("vl", ops=".750"),  # combined line for a player traded mid-season
+    ]
+    fake = fake_mlb(lambda r: httpx.Response(200, json={"stats": [_block("statSplits", rows)]}))
+    result = await call_tool(
+        "get_player_stats", {"player_id": 1, "season": 2026, "split": "handedness"}
+    )
+
+    data = result.data
+    assert [(line["situation"], line["stats"]["ops"]) for line in data["splits"]] == [
+        ("vs_left", ".750"),
+        ("vs_right", ".839"),
+    ]
+    assert data["split"] == "handedness"
+    assert "advanced" not in data
+    params = fake.requests[0].url.params
+    assert params["stats"] == "statSplits" and params["sitCodes"] == "vl,vr"
+    assert params["season"] == "2026"
+
+
+async def test_career_split_covers_every_season(fake_mlb, call_tool):
+    fake = fake_mlb(lambda r: httpx.Response(200, json={"stats": []}))
+    result = await call_tool(
+        "get_player_stats", {"player_id": 1, "stat_type": "career", "split": "month"}
+    )
+    params = fake.requests[0].url.params
+    assert params["stats"] == "careerStatSplits" and "season" not in params
+    assert params["sitCodes"] == "3,4,5,6,7,8,9,10"
+    assert result.data["note"] == "No hitting month splits found for this player."
+
+
+@pytest.mark.parametrize("arguments", [{"group": "fielding"}, {"stat_type": "yearByYear"}])
+async def test_split_needs_hitting_or_pitching_by_season_or_career(fake_mlb, call_tool, arguments):
+    fake = fake_mlb(lambda r: httpx.Response(200, json={"stats": []}))
+    result = await call_tool(
+        "get_player_stats", {"player_id": 1, "split": "home_away", **arguments}
+    )
+    assert result.is_error and "split works for" in result.text
+    assert not fake.requests
+
+
 async def test_unknown_player_is_reported_to_the_model(fake_mlb, call_tool):
     fake_mlb(lambda r: httpx.Response(200, json={"people": []}))
     result = await call_tool("get_player_info", {"player_id": 999})
