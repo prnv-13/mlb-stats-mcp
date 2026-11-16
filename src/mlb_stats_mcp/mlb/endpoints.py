@@ -26,5 +26,9 @@ def game_boxscore(game_pk: int) -> str:
     return f"/game/{game_pk}/boxscore"
 
 
+def draft(season: int) -> str:
+    return f"/draft/{season}"
+
+
 def award_recipients(award_id: str) -> str:
     return f"/awards/{award_id}/recipients"

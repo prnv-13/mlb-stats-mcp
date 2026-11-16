@@ -109,6 +109,8 @@ class Limits:
     MAX_COMPARE_PLAYERS: Final = 5
     DEFAULT_FREE_AGENTS: Final = 25
     MAX_FREE_AGENTS: Final = 400  # a whole class, minor leaguers included, is ~350
+    DEFAULT_DRAFT_PICKS: Final = 50
+    MAX_DRAFT_PICKS: Final = 700  # a whole draft: 20 rounds plus compensation picks, ~615
 
 
 class GameType:

@@ -6,6 +6,7 @@ from mcp.server.mcpserver import MCPServer
 
 from . import (
     awards,
+    draft,
     free_agents,
     games,
     leaders,
@@ -34,6 +35,7 @@ ALL_TOOLS = (
     free_agents.get_free_agents,
     awards.get_award_winners,
     awards.get_player_awards,
+    draft.get_draft,
 )
 
 
