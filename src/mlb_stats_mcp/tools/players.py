@@ -9,6 +9,7 @@ from typing_extensions import NotRequired, TypedDict
 
 from ..config import CacheTTL, Limits, MLBApi
 from ..mlb import endpoints, get_client
+from . import advanced
 from .common import (
     JSON,
     HittingOrPitching,
@@ -19,6 +20,7 @@ from .common import (
     current_season,
     dig,
     season_cache_ttl,
+    stat_blocks,
 )
 
 # Key stats kept per game in a game log (the API returns ~40 per game).
@@ -86,6 +88,7 @@ class PlayerStats(TypedDict):
     stat_type: StatType
     splits: list[StatLine]
     season: NotRequired[int]
+    advanced: NotRequired[Stats]  # single seasons of hitting or pitching only
     note: NotRequired[str]
 
 
@@ -228,7 +231,9 @@ async def get_player_stats(
     stat_type: StatType = "season",
     season: int | None = None,
 ) -> PlayerStats:
-    """Get a player's batting, pitching or fielding stats.
+    """Get a player's batting, pitching or fielding stats. For one season of hitting or
+    pitching it also returns advanced stats: WAR, wRC+, wOBA, FIP, xFIP, ERA-/FIP- and the
+    Statcast expected stats xBA, xSLG and xwOBA (for pitchers, what hitters did against them).
 
     Args:
         player_id: MLB player id from search_players.
@@ -239,13 +244,21 @@ async def get_player_stats(
     is_single_season = stat_type == "season"
     if is_single_season:
         season = season or current_season()
+    # Advanced stats are separate stats types, fetched in the same request.
+    with_advanced = is_single_season and group in advanced.FIELDS
+    stat_types = (stat_type, *advanced.STAT_TYPES) if with_advanced else (stat_type,)
 
     data = await get_client().get(
         endpoints.person_stats(player_id),
-        {"stats": stat_type, "group": group, "season": season if is_single_season else None},
+        {
+            "stats": ",".join(stat_types),
+            "group": group,
+            "season": season if is_single_season else None,
+        },
         ttl=season_cache_ttl(season) if is_single_season else CacheTTL.CURRENT_SEASON,
     )
-    splits = [_format_stat_split(split) for split in _all_splits(data)]
+    blocks = stat_blocks(data)
+    splits = [_format_stat_split(split) for split in blocks.get(stat_type, [])]
 
     result: PlayerStats = {
         "player_id": player_id,
@@ -255,6 +268,8 @@ async def get_player_stats(
     }
     if is_single_season:
         result["season"] = season
+    if with_advanced and (advanced_stats := advanced.pick_advanced(blocks, group)):
+        result["advanced"] = advanced_stats
     if not splits:
         result["note"] = (
             f"No {group} stats found. The player may not have played in {season} "

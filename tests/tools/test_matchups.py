@@ -15,16 +15,25 @@ PEOPLE = {
 }
 
 
-def _people_response(request: httpx.Request, stats_by_id: dict | None = None) -> httpx.Response:
+def _people_response(
+    request: httpx.Request, stats_by_id: dict | None = None, sabermetrics_by_id: dict | None = None
+) -> httpx.Response:
+    """/people, hydrated with season splits and (optionally) one sabermetrics line per player."""
     ids = [int(pid) for pid in request.url.params["personIds"].split(",")]
     people = []
     for pid in ids:
         if pid in PEOPLE:
-            person = dict(PEOPLE[pid])
+            person = dict(PEOPLE[pid], stats=[])
             if stats_by_id and pid in stats_by_id:
-                person["stats"] = [{"splits": stats_by_id[pid]}]
+                person["stats"].append(_block("season", stats_by_id[pid]))
+            if sabermetrics_by_id and pid in sabermetrics_by_id:
+                person["stats"].append(_block("sabermetrics", [{"stat": sabermetrics_by_id[pid]}]))
             people.append(person)
     return httpx.Response(200, json={"people": people})
+
+
+def _block(stat_type: str, splits: list[dict]) -> dict:
+    return {"type": {"displayName": stat_type}, "splits": splits}
 
 
 # ------------------------------------------------------------------ matchups --
@@ -141,6 +150,21 @@ async def test_lower_is_better_for_pitching_rate_stats(fake_mlb, call_tool):
         "whip": "Tarik Skubal",
         "strikeOuts": "Tarik Skubal",
     }
+
+
+async def test_season_comparison_ranks_advanced_stats(fake_mlb, call_tool):
+    stats = {JUDGE: [_season_split("A", era="2.50")], SKUBAL: [_season_split("B", era="3.10")]}
+    sabermetrics = {JUDGE: {"war": 1.0, "fip": 4.2}, SKUBAL: {"war": 5.2086123, "fip": 2.5}}
+    fake = fake_mlb(lambda r: _people_response(r, stats, sabermetrics))
+    result = await call_tool(
+        "compare_players", {"player_ids": [JUDGE, SKUBAL], "group": "pitching", "season": 2026}
+    )
+
+    assert result.data["players"][1]["stats"]["war"] == 5.209  # rounded
+    leaders = result.data["leaders"]
+    assert leaders["war"] == leaders["fip"] == "Tarik Skubal"  # fip: lower is better
+    assert leaders["era"] == "Aaron Judge"
+    assert "type=[season,sabermetrics,expectedStatistics]" in fake.requests[0].url.params["hydrate"]
 
 
 async def test_traded_player_uses_combined_line_and_lists_teams(fake_mlb, call_tool):

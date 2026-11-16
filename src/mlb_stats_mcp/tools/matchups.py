@@ -3,24 +3,26 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any, Literal
+from typing import Any
 
 from mcp.server.mcpserver.exceptions import ToolError
 from typing_extensions import NotRequired, TypedDict
 
 from ..config import CacheTTL, GameType, Limits, Matchups
 from ..mlb import endpoints, get_client
+from . import advanced
 from .common import (
     JSON,
+    Better,
     HittingOrPitching,
     SeasonOrCareer,
     Stats,
     current_season,
     dig,
+    overall_split,
     season_cache_ttl,
+    stat_blocks,
 )
-
-Better = Literal["higher", "lower"]
 
 # Stats kept for a batter-vs-pitcher matchup.
 MATCHUP_FIELDS = (
@@ -29,7 +31,8 @@ MATCHUP_FIELDS = (
 )  # fmt: skip
 
 # Stats shown in a comparison, and which direction wins. None means context only
-# (playing time), so no player is called the leader in it.
+# (playing time), so no player is called the leader in it. Single-season comparisons
+# add the advanced stats in advanced.FIELDS.
 COMPARE_FIELDS: dict[str, dict[str, Better | None]] = {
     "hitting": {
         "gamesPlayed": None, "plateAppearances": None, "avg": "higher", "obp": "higher",
@@ -79,7 +82,7 @@ class Matchup(TypedDict):
 class ComparedPlayer(PlayerRef):
     position: str | None
     current_team: str | None
-    stats: Stats
+    stats: Stats  # single seasons include advanced stats such as war and fip
     played_for: NotRequired[list[str]]  # single-season comparisons only
 
 
@@ -128,13 +131,6 @@ def _as_number(value: Any) -> float | None:
 
 
 # ------------------------------------------------------------------ matchups --
-
-
-def _blocks_by_type(stats_response: JSON) -> dict[str, list[JSON]]:
-    return {
-        dig(block, "type", "displayName"): block.get("splits", [])
-        for block in stats_response.get("stats", [])
-    }
 
 
 def _game_type_name(split: JSON) -> str:
@@ -192,7 +188,7 @@ async def get_matchup(batter_id: int, pitcher_id: int, include_postseason: bool 
         },
         ttl=CacheTTL.CURRENT_SEASON,
     )
-    blocks = _blocks_by_type(data)
+    blocks = stat_blocks(data)
     totals = {
         _game_type_name(split): _pick(split.get("stat") or {}, MATCHUP_FIELDS)
         for split in blocks.get(CAREER_TOTALS_BLOCK, [])
@@ -221,41 +217,44 @@ async def get_matchup(batter_id: int, pitcher_id: int, include_postseason: bool 
 def _stats_hydration(
     group: HittingOrPitching, stat_type: SeasonOrCareer, season: int | None
 ) -> str:
-    """The /people hydrate value that embeds each player's current team and stats."""
-    season_filter = f",season={season}" if stat_type == "season" else ""
-    return f"currentTeam,stats(group=[{group}],type=[{stat_type}]{season_filter})"
+    """The /people hydrate value that embeds each player's current team and stats.
 
-
-def _stat_splits(person: JSON) -> list[JSON]:
-    return [split for block in person.get("stats", []) for split in block.get("splits", [])]
-
-
-def _overall_split(splits: list[JSON]) -> JSON | None:
-    """A traded player has one split per team plus a combined one (no team); prefer combined."""
-    combined = [split for split in splits if not split.get("team")]
-    return (combined or splits or [None])[0]
+    Single seasons also get the advanced stats types; MLB has no career version of them.
+    """
+    if stat_type == "season":
+        types = ",".join((stat_type, *advanced.STAT_TYPES))
+        return f"currentTeam,stats(group=[{group}],type=[{types}],season={season})"
+    return f"currentTeam,stats(group=[{group}],type=[{stat_type}])"
 
 
 def _format_compared_player(
     person: JSON, group: HittingOrPitching, stat_type: SeasonOrCareer
 ) -> ComparedPlayer:
-    splits = _stat_splits(person)
-    overall = _overall_split(splits)
+    blocks = stat_blocks(person)
+    splits = blocks.get(stat_type, [])
+    overall = overall_split(splits)
+    stats = _pick(overall.get("stat") or {}, COMPARE_FIELDS[group]) if overall else {}
     row: ComparedPlayer = {
         **_player_ref(person),
         "position": dig(person, "primaryPosition", "abbreviation"),
         "current_team": dig(person, "currentTeam", "name"),
-        "stats": _pick(overall.get("stat") or {}, COMPARE_FIELDS[group]) if overall else {},
+        "stats": stats,
     }
     if stat_type == "season":
+        stats.update(advanced.pick_advanced(blocks, group))
         row["played_for"] = [team for split in splits if (team := dig(split, "team", "name"))]
     return row
+
+
+def _ranked_fields(group: HittingOrPitching) -> dict[str, Better | None]:
+    advanced_fields = {name: stat.better for name, stat in advanced.FIELDS[group].items()}
+    return {**COMPARE_FIELDS[group], **advanced_fields}
 
 
 def _leaders(players: list[ComparedPlayer], group: HittingOrPitching) -> dict[str, str]:
     """For each stat with a better direction, the player who leads it ("tie" if shared)."""
     leaders = {}
-    for stat, better in COMPARE_FIELDS[group].items():
+    for stat, better in _ranked_fields(group).items():
         if better is None:
             continue
         values = {p["name"]: _as_number(p["stats"].get(stat)) for p in players}
@@ -275,7 +274,8 @@ async def compare_players(
     season: int | None = None,
 ) -> Comparison:
     """Compare 2-5 players side by side for one season or their careers, and say who leads
-    each stat (e.g. OPS, home runs, ERA, WHIP). Use for "who's better, X or Y?" questions.
+    each stat (e.g. OPS, home runs, ERA, WHIP). Single seasons also compare WAR, wRC+, FIP
+    and expected stats. Use for "who's better, X or Y?" questions.
 
     Args:
         player_ids: 2-5 player ids from search_players.

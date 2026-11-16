@@ -65,6 +65,39 @@ async def test_search_without_matches_says_so(fake_mlb, call_tool):
     assert result.data == {"count": 0, "players": [], "note": "No MLB players match 'nobody'."}
 
 
+def _block(stat_type: str, splits: list[dict]) -> dict:
+    return {"type": {"displayName": stat_type}, "splits": splits}
+
+
+async def test_season_stats_include_advanced_stats(fake_mlb, call_tool):
+    response = {
+        "stats": [
+            _block("season", [{"season": "2026", "stat": {"homeRuns": 40, "summary": "..."}}]),
+            _block("sabermetrics", [{"stat": {"war": 8.123456, "wRcPlus": 180.4, "spd": 3.1}}]),
+            _block("expectedStatistics", [{"stat": {"avg": ".300", "slg": ".650"}}]),
+        ]
+    }
+    fake = fake_mlb(lambda r: httpx.Response(200, json=response))
+    result = await call_tool("get_player_stats", {"player_id": 1, "season": 2026})
+
+    assert [s["stats"] for s in result.data["splits"]] == [{"homeRuns": 40}]
+    assert result.data["advanced"] == {"war": 8.123, "wRcPlus": 180.4, "xba": ".300", "xslg": ".650"}
+    assert fake.requests[0].url.params["stats"] == "season,sabermetrics,expectedStatistics"
+
+
+@pytest.mark.parametrize(
+    ("arguments", "requested"),
+    [({"stat_type": "career"}, "career"), ({"group": "fielding", "season": 2026}, "season")],
+)
+async def test_advanced_stats_are_only_for_seasons_of_hitting_or_pitching(
+    fake_mlb, call_tool, arguments, requested
+):
+    fake = fake_mlb(lambda r: httpx.Response(200, json={"stats": []}))
+    result = await call_tool("get_player_stats", {"player_id": 1, **arguments})
+    assert "advanced" not in result.data
+    assert fake.requests[0].url.params["stats"] == requested
+
+
 async def test_unknown_player_is_reported_to_the_model(fake_mlb, call_tool):
     fake_mlb(lambda r: httpx.Response(200, json={"people": []}))
     result = await call_tool("get_player_info", {"player_id": 999})

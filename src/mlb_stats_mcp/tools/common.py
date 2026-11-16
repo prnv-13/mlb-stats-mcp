@@ -20,6 +20,9 @@ JSON = dict[str, Any]  # a raw MLB API object
 # Stat name → value, as MLB sends it: counts are numbers, rates are strings like ".312".
 Stats = dict[str, Any]
 
+# Which way a stat is better, for ranking players on it.
+Better = Literal["higher", "lower"]
+
 # Argument types. Literal values become enums in the JSON Schema the model sees.
 StatGroup = Literal["hitting", "pitching", "fielding"]
 HittingOrPitching = Literal["hitting", "pitching"]
@@ -77,6 +80,25 @@ def season_cache_ttl(season: int | None) -> int:
 
 def clamp(value: int, low: int, high: int) -> int:
     return max(low, min(value, high))
+
+
+def stat_blocks(container: JSON, group: str | None = None) -> dict[str, list[JSON]]:
+    """Splits from a stats response (or a person hydrated with stats), keyed by stats type.
+
+    A request for stats=season,sabermetrics returns one block per type (and per group);
+    pass group to keep only that group's blocks.
+    """
+    return {
+        dig(block, "type", "displayName"): block.get("splits", [])
+        for block in container.get("stats", [])
+        if group is None or dig(block, "group", "displayName") == group
+    }
+
+
+def overall_split(splits: list[JSON]) -> JSON | None:
+    """A traded player has one split per team plus a combined one (no team); prefer combined."""
+    combined = [split for split in splits if not split.get("team")]
+    return (combined or splits or [None])[0]
 
 
 def dig(data: Any, *keys: str) -> Any:
