@@ -30,6 +30,11 @@ SeasonOrCareer = Literal["season", "career"]
 StatType = Literal["season", "career", "yearByYear"]
 RosterType = Literal["active", "40Man", "fullSeason"]
 LeagueCode = Literal["AL", "NL", "MLB"]
+FreeAgentStatus = Literal["available", "signed", "all"]
+# "P", "IF" and "OF" match every pitcher, infielder or outfielder (config.FreeAgency).
+Position = Literal[
+    "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH", "SP", "RP", "P", "IF", "OF"
+]  # fmt: skip
 # These two mirror the keys of config.Transactions.TYPE_CODES_BY_KIND and
 # config.Awards.IDS_BY_NAME (a test keeps them in sync).
 TransactionKind = Literal[

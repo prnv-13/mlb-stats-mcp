@@ -15,8 +15,9 @@ INSTRUCTIONS = (
     "Team arguments accept a name, nickname, abbreviation or numeric id "
     "(e.g. 'Yankees', 'NYY', 'New York Yankees', '147'). "
     "Seasons default to the current year; during the off-season pass the previous year "
-    "if the current one has no data. In the off-season, get_transactions covers signings and "
-    "trades, and get_award_winners covers MVP, Cy Young and other awards. Dates are YYYY-MM-DD."
+    "if the current one has no data. In the off-season, get_free_agents ranks who is still "
+    "available (or who signed where), get_transactions covers signings and trades, and "
+    "get_award_winners covers MVP, Cy Young and other awards. Dates are YYYY-MM-DD."
 )
 
 

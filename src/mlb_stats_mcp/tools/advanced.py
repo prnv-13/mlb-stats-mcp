@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .common import JSON, Better, HittingOrPitching, Stats, overall_split
+from .common import JSON, Better, HittingOrPitching, Stats, overall_split, stat_blocks
 
 SABERMETRICS = "sabermetrics"
 EXPECTED = "expectedStatistics"
@@ -56,5 +56,21 @@ def pick_advanced(blocks: dict[str, list[JSON]], group: HittingOrPitching) -> St
     for name, stat in FIELDS[group].items():
         value = lines[stat.stat_type].get(stat.field)
         if value is not None:
-            picked[name] = round(value, DECIMALS) if isinstance(value, float) else value
+            picked[name] = _rounded(value) if isinstance(value, float) else value
     return picked
+
+
+def season_war(person: JSON) -> float | None:
+    """WAR for a person hydrated with sabermetrics, hitting and pitching added together
+    (so a two-way player gets credit for both). None if they have no MLB stats."""
+    wars = []
+    for group in FIELDS:
+        line = overall_split(stat_blocks(person, group).get(SABERMETRICS, [])) or {}
+        war = (line.get("stat") or {}).get("war")
+        if war is not None:
+            wars.append(war)
+    return _rounded(sum(wars)) if wars else None
+
+
+def _rounded(value: float) -> float:
+    return round(value, DECIMALS) + 0.0  # + 0.0 turns -0.0 into 0.0

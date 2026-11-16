@@ -3,6 +3,7 @@
 TEAMS = "/teams"
 PEOPLE = "/people"
 PEOPLE_SEARCH = "/people/search"
+FREE_AGENTS = "/people/freeAgents"
 STATS_LEADERS = "/stats/leaders"
 SCHEDULE = "/schedule"
 STANDINGS = "/standings"

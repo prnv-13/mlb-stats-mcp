@@ -73,6 +73,7 @@ class CacheTTL:
     ROSTER: Final = SECONDS_PER_HOUR  # also player bios, past schedules, past transactions
     RECENT_TRANSACTIONS: Final = 5 * SECONDS_PER_MINUTE  # moves are posted throughout the day
     AWARDS: Final = SECONDS_PER_HOUR  # new winners are added during awards week each November
+    FREE_AGENTS: Final = 5 * SECONDS_PER_MINUTE  # signings are posted throughout the offseason
     STATIC: Final = SECONDS_PER_DAY  # teams, finished games, past seasons
 
 
@@ -106,6 +107,8 @@ class Limits:
     MAX_AWARD_SEASONS: Final = 100  # MVPs date back to 1931
     MIN_COMPARE_PLAYERS: Final = 2
     MAX_COMPARE_PLAYERS: Final = 5
+    DEFAULT_FREE_AGENTS: Final = 25
+    MAX_FREE_AGENTS: Final = 400  # a whole class, minor leaguers included, is ~350
 
 
 class GameType:
@@ -149,6 +152,21 @@ class Transactions:
         "releases": frozenset({"REL", "URL"}),
         "status_changes": frozenset({"SC", "RE"}),  # injured list placements and activations
         "call_ups_and_options": frozenset({"CU", "OPT", "SE", "CP", "ASG"}),
+    }
+
+
+class FreeAgency:
+    """The free agent class MLB publishes each offseason (/people/freeAgents)."""
+
+    # Entries with this note are minor-league free agents, left out unless asked for.
+    MINOR_LEAGUE_NOTE: Final = "Minor League Free Agent"
+
+    # Position filters that match a whole group, by MLB's position type. Any other
+    # filter must equal the listed position's abbreviation.
+    POSITION_TYPES_BY_GROUP: Final[dict[str, str]] = {
+        "P": "Pitcher",
+        "IF": "Infielder",
+        "OF": "Outfielder",
     }
 
 
