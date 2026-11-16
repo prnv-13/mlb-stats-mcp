@@ -1,4 +1,5 @@
-"""Award tools: winners of MVP, Cy Young, Gold Glove and other MLB awards."""
+"""Award tools: winners of MVP, Cy Young, Gold Glove and other MLB awards, and Hall of Fame
+inductees."""
 
 from __future__ import annotations
 
@@ -105,7 +106,7 @@ async def get_award_winners(
 
     Args:
         award: Which award, e.g. "mvp", "cy_young", "rookie_of_the_year", "gold_glove",
-            "silver_slugger", "world_series_mvp".
+            "silver_slugger", "world_series_mvp", or "hall_of_fame" (by induction year).
         league: "AL", "NL" or "MLB" (both leagues). Ignored for awards given across all of
             MLB, such as world_series_mvp.
         season: Season year. Defaults to the most recent season with a winner.
@@ -139,14 +140,15 @@ async def get_award_winners(
         )
         result["note"] = (
             f"No {award} winners recorded for {period}. "
-            "Most awards are announced in November, after the season ends."
+            "Most awards are announced in November, after the season ends; Hall of Fame "
+            "classes are elected in January and inducted in July."
         )
     return result
 
 
 async def get_player_awards(player_id: int) -> PlayerAwards:
-    """Get the major MLB awards a player has won (MVP, Cy Young, Gold Glove, All-Star and so on),
-    with the seasons for each.
+    """Get the major MLB awards a player has won (MVP, Cy Young, Gold Glove, All-Star, Hall of
+    Fame and so on), with the seasons for each.
 
     Args:
         player_id: MLB player id from search_players.

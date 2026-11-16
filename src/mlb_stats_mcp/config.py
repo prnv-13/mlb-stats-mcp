@@ -196,4 +196,5 @@ class Awards:
         "roberto_clemente": {"MLB": "MLBRC"},
         "all_mlb_first_team": {"MLB": "MLBAFIRST"},
         "all_mlb_second_team": {"MLB": "MLBSECOND"},
+        "hall_of_fame": {"MLB": "MLBHOF"},  # season is the induction year
     }

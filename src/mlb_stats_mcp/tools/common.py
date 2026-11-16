@@ -45,7 +45,7 @@ AwardName = Literal[
     "mvp", "cy_young", "rookie_of_the_year", "manager_of_the_year", "comeback_player",
     "hank_aaron", "silver_slugger", "gold_glove", "platinum_glove", "all_star", "lcs_mvp",
     "world_series_mvp", "all_star_game_mvp", "roberto_clemente", "all_mlb_first_team",
-    "all_mlb_second_team",
+    "all_mlb_second_team", "hall_of_fame",
 ]  # fmt: skip
 
 # Every tool only reads public data, so clients may call them freely.

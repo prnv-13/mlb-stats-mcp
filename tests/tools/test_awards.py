@@ -35,6 +35,10 @@ RECIPIENTS = {
         _recipient("ALCPOY", 2025, 7, "Comeback"),
     ],
     "WSMVP": [_recipient("WSMVP", 2025, 21, "WS 2025")],
+    "MLBHOF": [
+        _recipient("MLBHOF", 2025, 31, "Inductee A"),
+        _recipient("MLBHOF", 2025, 32, "Inductee B"),
+    ],
 }
 
 
@@ -72,6 +76,13 @@ async def test_mlb_wide_award_ignores_league(fake_mlb, call_tool):
     result = await call_tool("get_award_winners", {"award": "world_series_mvp", "league": "AL"})
     assert result.data["leagues"] == ["MLB"]
     assert result.data["winners"][0]["name"] == "WS 2025"
+
+
+async def test_hall_of_fame_lists_every_inductee_of_a_year(fake_mlb, call_tool):
+    fake_mlb(_serve_awards)
+    result = await call_tool("get_award_winners", {"award": "hall_of_fame"})
+    assert [w["name"] for w in result.data["winners"]] == ["Inductee A", "Inductee B"]
+    assert result.data["leagues"] == ["MLB"]
 
 
 async def test_duplicate_listings_are_merged(fake_mlb, call_tool):
