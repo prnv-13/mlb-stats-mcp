@@ -13,7 +13,7 @@ from .server import build_server
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="mlb-stats-mcp",
-        description="MCP server for MLB stats (players, games, standings, leaders).",
+        description="MCP server for MLB stats (players, games, standings, free agents, awards).",
     )
     parser.add_argument(
         "--transport",

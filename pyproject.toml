@@ -1,7 +1,7 @@
 [project]
 name = "mlb-stats-mcp"
 version = "0.1.0"
-description = "MCP server for MLB stats: players, live games, schedules, standings and league leaders."
+description = "MCP server for MLB stats: players, advanced stats, live games, standings, leaders, free agents, the draft and awards."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
