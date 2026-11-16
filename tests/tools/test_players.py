@@ -81,7 +81,8 @@ async def test_season_stats_include_advanced_stats(fake_mlb, call_tool):
     result = await call_tool("get_player_stats", {"player_id": 1, "season": 2026})
 
     assert [s["stats"] for s in result.data["splits"]] == [{"homeRuns": 40}]
-    assert result.data["advanced"] == {"war": 8.123, "wRcPlus": 180.4, "xba": ".300", "xslg": ".650"}
+    advanced = {"war": 8.123, "wRcPlus": 180.4, "xba": ".300", "xslg": ".650"}
+    assert result.data["advanced"] == advanced
     assert fake.requests[0].url.params["stats"] == "season,sabermetrics,expectedStatistics"
 
 

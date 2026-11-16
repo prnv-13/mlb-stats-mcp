@@ -1,8 +1,9 @@
 # MLB Stats MCP
 
 An [MCP](https://modelcontextprotocol.io) server that gives Claude (or any MCP client) live and
-historical Major League Baseball data: players, season and career stats, schedules, live box
-scores, standings and league leaders.
+historical Major League Baseball data: players, season, career and advanced stats (WAR, wRC+,
+FIP, expected stats), schedules, live box scores, standings, leaders, free agents, the draft
+and awards.
 
 It uses the public MLB Stats API (`statsapi.mlb.com`), so there are no API keys or sign-up.
 
@@ -13,9 +14,11 @@ Ask things like:
 - "How did Aaron Judge's 2026 compare to his career averages?"
 - "Who's pitching for the Dodgers tonight, and what are their ERAs?"
 - "Show me the AL standings and who's leading the wild card."
-- "Top 10 home run hitters in the NL this season."
+- "Top 10 home run hitters in the NL this season." / "Who led the Yankees in home runs?"
 - "Who won the Cy Young this year, and who has the Mets signed this offseason?"
 - "How has Aaron Judge hit against Tarik Skubal?" / "Judge or Ohtani: who had the better 2026?"
+- "Who are the best free agents still available?" / "Where did the Mets' free agents go?"
+- "Who did the Yankees draft in 2026?" / "Who went into the Hall of Fame this year?"
 
 ## Tools
 
@@ -23,19 +26,21 @@ Ask things like:
 |---|---|
 | `search_players` | Name → `player_id`, position, current team |
 | `get_player_info` | Bio: age, height, bats/throws, debut, birthplace |
-| `get_player_stats` | Hitting / pitching / fielding, by season, career or year-by-year |
+| `get_player_stats` | Hitting / pitching / fielding, by season, career or year-by-year; single seasons add WAR, wRC+, wOBA, FIP and xBA / xSLG / xwOBA |
 | `get_player_game_log` | Game-by-game stats, most recent first, for recent form and streaks |
 | `get_matchup` | A batter's career line against one pitcher, total and by season, optional postseason |
-| `compare_players` | 2-5 players side by side for a season or career, with the leader in each stat |
-| `get_league_leaders` | Leaders for any stat category, AL / NL / MLB |
+| `compare_players` | 2-5 players side by side for a season or career, with the leader in each stat (WAR and FIP included for seasons) |
+| `get_league_leaders` | Leaders for any stat category: AL / NL / MLB, or one team |
 | `get_standings` | Division standings with games back, streak, run differential |
 | `list_teams` | All 30 teams with ids, league, division, ballpark |
 | `get_team_roster` | Active, 40-man or full-season roster |
 | `get_schedule` | Games for a date or range, with scores and probable pitchers |
 | `get_game` | Line score by inning plus batting and pitching box score |
 | `get_transactions` | Signings, trades, waivers, DFAs, releases, injured list moves and call-ups, by team, player or date range |
-| `get_award_winners` | MVP, Cy Young, Rookie of the Year, Gold Glove, Silver Slugger and more, for one season or many |
+| `get_free_agents` | The latest free agent class ranked by WAR: available or signed, by position or team |
+| `get_award_winners` | MVP, Cy Young, Rookie of the Year, Gold Glove, Silver Slugger, Hall of Fame and more, for one season or many |
 | `get_player_awards` | Every major award a player has won, with the seasons |
+| `get_draft` | Draft picks by year, round or team, with school and signing bonus |
 
 Team arguments accept `"Yankees"`, `"NYY"`, `"New York Yankees"` or `"147"`.
 
@@ -57,7 +62,7 @@ fresh one.
 |---|---|
 | Live games | 15 s |
 | Today's schedule | 1 min |
-| Standings, leaders, current-season stats, this week's transactions | 5 min |
+| Standings, leaders, current-season stats, this week's transactions, free agents | 5 min |
 | Rosters, player bios, award winners, past transactions | 1 h |
 | Teams, finished games, past seasons | 24 h |
 
@@ -130,7 +135,8 @@ src/mlb_stats_mcp/
     errors.py      MLBApiError
   tools/           the MCP tools, one module per area
     teams.py  players.py  leaders.py  games.py  standings.py
-    transactions.py  awards.py  matchups.py
+    transactions.py  free_agents.py  awards.py  draft.py  matchups.py
+    advanced.py    WAR, wRC+, FIP and expected stats, shared by the player tools
     common.py      shared types, annotations, date and season helpers
                    (each tool module declares its result types as TypedDicts)
 tests/             offline pytest suite, mirrors src/ (mlb/, tools/)

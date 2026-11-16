@@ -17,7 +17,9 @@ INSTRUCTIONS = (
     "Seasons default to the current year; during the off-season pass the previous year "
     "if the current one has no data. In the off-season, get_free_agents ranks who is still "
     "available (or who signed where), get_transactions covers signings and trades, and "
-    "get_award_winners covers MVP, Cy Young and other awards. Dates are YYYY-MM-DD."
+    "get_award_winners covers MVP, Cy Young, other awards and the Hall of Fame. For a single "
+    "season, get_player_stats and compare_players include WAR, wRC+, FIP and expected stats. "
+    "Dates are YYYY-MM-DD."
 )
 
 
