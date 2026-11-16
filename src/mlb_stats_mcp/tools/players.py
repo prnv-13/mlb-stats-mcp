@@ -113,12 +113,12 @@ class GameLog(TypedDict):
 # ----------------------------------------------------------------- formatting --
 
 
-def _format_search_result(person: JSON, current_team: str | None) -> PlayerMatch:
+def _format_search_result(person: JSON) -> PlayerMatch:
     return {
         "player_id": person["id"],
         "name": person.get("fullName"),
         "position": dig(person, "primaryPosition", "abbreviation"),
-        "current_team": current_team,
+        "current_team": dig(person, "currentTeam", "name"),
         "active": person.get("active"),
         "mlb_debut": person.get("mlbDebutDate"),
     }
@@ -190,28 +190,20 @@ async def search_players(name: str, active_only: bool = False) -> PlayerSearch:
         name: Full or partial name, e.g. "Ohtani" or "Aaron Judge".
         active_only: Only return currently active players.
     """
-    client = get_client()
-    search = await client.get(
+    search = await get_client().get(
         endpoints.PEOPLE_SEARCH,
         {
             "names": name,
             "sportIds": MLBApi.SPORT_ID_MLB,
             "active": "true" if active_only else None,
+            "hydrate": "currentTeam",
         },
-        ttl=CacheTTL.STATIC,
+        ttl=CacheTTL.ROSTER,  # current teams change with trades and signings
     )
     people = search.get("people", [])[: Limits.MAX_SEARCH_RESULTS]
     if not people:
         return {"count": 0, "players": [], "note": f"No MLB players match '{name}'."}
-
-    # Search results omit the current team, so fetch it for all matches in one request.
-    details = await client.get(
-        endpoints.PEOPLE,
-        {"personIds": ",".join(str(p["id"]) for p in people), "hydrate": "currentTeam"},
-        ttl=CacheTTL.ROSTER,
-    )
-    team_by_player = {p["id"]: dig(p, "currentTeam", "name") for p in details.get("people", [])}
-    players = [_format_search_result(p, team_by_player.get(p["id"])) for p in people]
+    players = [_format_search_result(person) for person in people]
     return {"count": len(players), "players": players}
 
 

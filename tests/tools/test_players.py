@@ -43,27 +43,26 @@ async def test_game_log_returns_most_recent_games_first(fake_mlb, call_tool):
 
 
 def _search_api(request: httpx.Request) -> httpx.Response:
-    if request.url.path.endswith("/people/search"):
-        judge = {"id": 592450, "fullName": "Aaron Judge", "active": True}
-        found = [judge] if request.url.params["names"] == "judge" else []
-        return httpx.Response(200, json={"people": found})
-    with_team = {"id": 592450, "currentTeam": {"name": "New York Yankees"}}
-    return httpx.Response(200, json={"people": [with_team]})
+    judge = {"id": 592450, "fullName": "Aaron Judge", "active": True}
+    if request.url.params.get("hydrate") == "currentTeam":
+        judge["currentTeam"] = {"name": "New York Yankees"}
+    found = [judge] if request.url.params["names"] == "judge" else []
+    return httpx.Response(200, json={"people": found})
 
 
 async def test_search_returns_matches_with_their_current_team(fake_mlb, call_tool):
-    fake_mlb(_search_api)
+    fake = fake_mlb(_search_api)
     result = await call_tool("search_players", {"name": "judge"})
     assert result.data["count"] == 1
     assert result.data["players"][0]["current_team"] == "New York Yankees"
     assert "note" not in result.data
+    assert len(fake.requests) == 1  # the team comes hydrated with the search
 
 
 async def test_search_without_matches_says_so(fake_mlb, call_tool):
-    fake = fake_mlb(_search_api)
+    fake_mlb(_search_api)
     result = await call_tool("search_players", {"name": "nobody"})
     assert result.data == {"count": 0, "players": [], "note": "No MLB players match 'nobody'."}
-    assert len(fake.requests) == 1  # no team lookup for an empty search
 
 
 async def test_unknown_player_is_reported_to_the_model(fake_mlb, call_tool):

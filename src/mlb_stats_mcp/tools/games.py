@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from mcp.server.mcpserver.exceptions import ToolError
 from typing_extensions import NotRequired, TypedDict
 
 from ..config import CacheTTL, MLBApi
@@ -159,12 +160,15 @@ def _games_in(schedule: JSON) -> list[JSON]:
     return [game for day in schedule.get("dates", []) for game in day.get("games", [])]
 
 
-async def _game_status(game_pk: int) -> JSON:
+async def _scheduled_game(game_pk: int) -> JSON:
+    """The game's schedule entry: its status, plus its line score (hydrated in the same call)."""
     schedule = await get_client().get(
-        endpoints.SCHEDULE, {"gamePk": game_pk}, ttl=CacheTTL.LIVE_GAME
+        endpoints.SCHEDULE, {"gamePk": game_pk, "hydrate": "linescore"}, ttl=CacheTTL.LIVE_GAME
     )
     games = _games_in(schedule)
-    return (games[0].get("status") or {}) if games else {}
+    if not games:
+        raise ToolError(f"No game with game_pk {game_pk}. Use get_schedule to find one.")
+    return games[0]
 
 
 # ---------------------------------------------------------------------- tools --
@@ -213,13 +217,13 @@ async def get_game(game_pk: int) -> Game:
     Args:
         game_pk: Game id from get_schedule.
     """
-    status = await _game_status(game_pk)
+    game = await _scheduled_game(game_pk)
+    status = game.get("status") or {}
+    line_score = game.get("linescore") or {}
     is_final = status.get("abstractGameState") == FINAL_GAME_STATE
-    ttl = CacheTTL.STATIC if is_final else CacheTTL.LIVE_GAME
-
-    client = get_client()
-    line_score = await client.get(endpoints.game_linescore(game_pk), ttl=ttl)
-    box_score = await client.get(endpoints.game_boxscore(game_pk), ttl=ttl)
+    box_score = await get_client().get(
+        endpoints.game_boxscore(game_pk), ttl=CacheTTL.STATIC if is_final else CacheTTL.LIVE_GAME
+    )
 
     return {
         "game_pk": game_pk,
