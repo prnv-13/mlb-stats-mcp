@@ -39,6 +39,14 @@ Ask things like:
 
 Team arguments accept `"Yankees"`, `"NYY"`, `"New York Yankees"` or `"147"`.
 
+### Results
+
+Every tool returns one JSON object, sent two ways in the MCP result: as JSON text in
+`content`, which the model reads, and as `structuredContent` for programs. Each tool's
+`outputSchema` (in `tools/list`) lists every field it returns and its type, so clients can
+validate results or generate types. Fields MLB doesn't have for a player or game are `null`.
+Some tools add a `note` field, for example when nothing matched or a sample is small.
+
 ### Caching and retries
 
 Responses are cached in memory, and each kind of data keeps its own lifetime, so repeated
@@ -124,14 +132,19 @@ src/mlb_stats_mcp/
     teams.py  players.py  leaders.py  games.py  standings.py
     transactions.py  awards.py  matchups.py
     common.py      shared types, annotations, date and season helpers
+                   (each tool module declares its result types as TypedDicts)
 tests/             offline pytest suite, mirrors src/ (mlb/, tools/)
 scripts/smoke_test.py   end-to-end test, works on stdio or an HTTP URL
 Dockerfile              for hosting the HTTP version
 ```
 
 Requests flow one way: `cli` → `server` → `tools/*` → `mlb.MLBClient` → statsapi.mlb.com.
-To add a tool, write an async function in the right `tools/` module (type hints and the
-docstring become its schema), then add it to `ALL_TOOLS` in `tools/__init__.py`.
+To add a tool, write an async function in the right `tools/` module. Its parameter hints and
+docstring become the input schema. Declare its result as a `TypedDict` from
+`typing_extensions` and use that as the return type, so the tool gets an output schema.
+Then add it to `ALL_TOOLS` in `tools/__init__.py`. The test helper checks that each result's
+`structuredContent` matches its text, which catches a key missing from the TypedDict (the SDK
+drops undeclared keys from `structuredContent`).
 
 ## Publishing guide
 

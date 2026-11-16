@@ -3,12 +3,47 @@
 from __future__ import annotations
 
 from mcp.server.mcpserver.exceptions import ToolError
+from typing_extensions import NotRequired, TypedDict
 
 from ..config import Awards, CacheTTL, Limits
 from ..mlb import endpoints, get_client
 from .common import JSON, AwardName, LeagueCode, clamp, dig
 
 ALL_LEAGUES = "MLB"
+
+
+class AwardWinner(TypedDict):
+    season: int
+    league: LeagueCode  # "MLB" for awards given across both leagues
+    player_id: int | None
+    name: str | None
+    position: str | None
+    team: str | None  # the winner's team that season
+
+
+class AwardWinners(TypedDict):
+    """Winners from from_season to to_season, newest first."""
+
+    award: AwardName
+    leagues: list[LeagueCode]
+    from_season: int
+    to_season: int
+    winners: list[AwardWinner]
+    note: NotRequired[str]
+
+
+class AwardCount(TypedDict):
+    award: AwardName
+    league: LeagueCode
+    count: int
+    seasons: list[int]
+
+
+class PlayerAwards(TypedDict):
+    player_id: int
+    name: str | None
+    awards: list[AwardCount]
+
 
 # Reverse lookup for a player's award list: MLB award id → (award name, league code).
 _AWARD_BY_ID: dict[str, tuple[str, str]] = {
@@ -37,7 +72,7 @@ async def _recipients(award_id: str) -> list[JSON]:
     return data.get("awards", [])
 
 
-def _format_winner(recipient: JSON, league: str) -> JSON:
+def _format_winner(recipient: JSON, league: LeagueCode) -> AwardWinner:
     return {
         "season": int(recipient["season"]),
         "league": league,
@@ -48,7 +83,7 @@ def _format_winner(recipient: JSON, league: str) -> JSON:
     }
 
 
-def _unique(winners: list[JSON]) -> list[JSON]:
+def _unique(winners: list[AwardWinner]) -> list[AwardWinner]:
     """Some awards list a winner twice (e.g. once per voting body); keep one of each."""
     seen: set[tuple] = set()
     unique = []
@@ -65,7 +100,7 @@ async def get_award_winners(
     league: LeagueCode = "MLB",
     season: int | None = None,
     seasons: int = Limits.DEFAULT_AWARD_SEASONS,
-) -> JSON:
+) -> AwardWinners:
     """Get the winners of an MLB award, newest season first.
 
     Args:
@@ -91,7 +126,7 @@ async def get_award_winners(
     in_range = [w for w in winners if first_season <= w["season"] <= last_season]
     in_range.sort(key=lambda w: (-w["season"], w["league"]))
 
-    result: JSON = {
+    result: AwardWinners = {
         "award": award,
         "leagues": list(ids_by_league),
         "from_season": first_season,
@@ -109,7 +144,7 @@ async def get_award_winners(
     return result
 
 
-async def get_player_awards(player_id: int) -> JSON:
+async def get_player_awards(player_id: int) -> PlayerAwards:
     """Get the major MLB awards a player has won (MVP, Cy Young, Gold Glove, All-Star and so on),
     with the seasons for each.
 

@@ -1,4 +1,9 @@
-"""Helpers and types shared by the tool modules."""
+"""Helpers and types shared by the tool modules.
+
+Each tool module declares its results as TypedDicts; the MCP SDK turns those into the
+tool's outputSchema and validates every result against them. Use typing_extensions'
+TypedDict (not typing's): pydantic needs it on Python < 3.12.
+"""
 
 from __future__ import annotations
 
@@ -10,7 +15,10 @@ from mcp_types import ToolAnnotations
 
 from ..config import CacheTTL, MLBApi
 
-JSON = dict[str, Any]
+JSON = dict[str, Any]  # a raw MLB API object
+
+# Stat name → value, as MLB sends it: counts are numbers, rates are strings like ".312".
+Stats = dict[str, Any]
 
 # Argument types. Literal values become enums in the JSON Schema the model sees.
 StatGroup = Literal["hitting", "pitching", "fielding"]

@@ -15,6 +15,7 @@ classifiers = [
 dependencies = [
     "httpx>=0.28.1",
     "mcp>=2.3.0,<3",
+    "typing-extensions>=4.12",
 ]
 
 [project.urls]

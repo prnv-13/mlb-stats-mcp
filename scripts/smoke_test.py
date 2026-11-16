@@ -95,6 +95,10 @@ async def main() -> int:
             if result.is_error != check.expect_error:
                 failures += 1
                 status += " (UNEXPECTED)"
+            elif not result.is_error and result.structured_content != json.loads(text):
+                # Real API data has a field the tool's result TypedDict doesn't declare.
+                failures += 1
+                status += " (structuredContent differs from text)"
             preview = text if len(text) < PREVIEW_CHARS else text[:PREVIEW_CHARS] + "..."
             print(f"[{status}] {check.tool}({json.dumps(check.arguments)})\n    {preview}\n")
 

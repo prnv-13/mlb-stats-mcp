@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from mcp.server.mcpserver.exceptions import ToolError
+from typing_extensions import NotRequired, TypedDict
 
 from ..config import CacheTTL, Limits, MLBApi, Transactions
 from ..mlb import endpoints, get_client
@@ -13,6 +14,29 @@ from .common import ISO_DATE_FORMAT, JSON, TransactionKind, clamp, dig, parse_da
 from .teams import resolve_team
 
 ALL_KINDS = "all"
+
+
+class Transaction(TypedDict):
+    date: str | None
+    type: str | None
+    player_id: int | None
+    player: str | None
+    from_team: str | None
+    to_team: str | None
+    description: str | None
+
+
+class TransactionList(TypedDict):
+    """Roster moves, newest first. A null filter means it wasn't applied."""
+
+    team: str | None
+    player_id: int | None
+    kind: TransactionKind
+    start_date: str | None
+    end_date: str | None
+    total_matching: int
+    transactions: list[Transaction]
+    note: NotRequired[str]
 
 
 @dataclass(frozen=True)
@@ -43,7 +67,7 @@ def _resolve_date_range(
     return DateRange(start, end)
 
 
-def _format_transaction(transaction: JSON) -> JSON:
+def _format_transaction(transaction: JSON) -> Transaction:
     return {
         "date": transaction.get("date"),
         "type": transaction.get("typeDesc"),
@@ -72,7 +96,7 @@ async def get_transactions(
     start_date: str | None = None,
     end_date: str | None = None,
     limit: int = Limits.DEFAULT_TRANSACTIONS,
-) -> JSON:
+) -> TransactionList:
     """Get MLB roster moves, newest first: free-agent signings, trades, waiver claims,
     designations for assignment, releases, injured list moves and call-ups. Use this for
     off-season "hot stove" questions like "who did the Yankees sign?" or "was he traded?".
@@ -116,7 +140,7 @@ async def get_transactions(
     matching.sort(key=_newest_first, reverse=True)
     shown = matching[: clamp(limit, 1, Limits.MAX_TRANSACTIONS)]
 
-    result: JSON = {
+    result: TransactionList = {
         "team": resolved_team["name"] if resolved_team else None,
         "player_id": player_id,
         "kind": kind,

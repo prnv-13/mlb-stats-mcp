@@ -2,12 +2,36 @@
 
 from __future__ import annotations
 
+from typing_extensions import TypedDict
+
 from ..config import League
 from ..mlb import endpoints, get_client
 from .common import JSON, LeagueCode, current_season, dig, season_cache_ttl
 
 
-def _format_team_record(record: JSON) -> JSON:
+class TeamStanding(TypedDict):
+    rank: str | None  # place in the division: "1", "2", ...
+    team: str | None
+    wins: int | None
+    losses: int | None
+    pct: str | None  # winning percentage, e.g. ".580"
+    games_back: str | None  # "-" for the division leader, otherwise e.g. "3.5"
+    wild_card_games_back: str | None
+    streak: str | None  # e.g. "W3"
+    run_differential: int | None
+
+
+class Division(TypedDict):
+    division: str | None
+    teams: list[TeamStanding]
+
+
+class Standings(TypedDict):
+    season: int
+    divisions: list[Division]
+
+
+def _format_team_record(record: JSON) -> TeamStanding:
     return {
         "rank": record.get("divisionRank"),
         "team": dig(record, "team", "name"),
@@ -21,14 +45,14 @@ def _format_team_record(record: JSON) -> JSON:
     }
 
 
-def _format_division(division: JSON) -> JSON:
+def _format_division(division: JSON) -> Division:
     return {
         "division": dig(division, "division", "name"),
         "teams": [_format_team_record(r) for r in division.get("teamRecords", [])],
     }
 
 
-async def get_standings(season: int | None = None, league: LeagueCode = "MLB") -> JSON:
+async def get_standings(season: int | None = None, league: LeagueCode = "MLB") -> Standings:
     """Get division standings: wins, losses, win %, games back, streak and run differential.
 
     Args:

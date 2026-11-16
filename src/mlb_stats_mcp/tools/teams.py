@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from mcp.server.mcpserver.exceptions import ToolError
+from typing_extensions import TypedDict
 
 from ..config import CacheTTL, MLBApi
 from ..mlb import endpoints, get_client
@@ -10,6 +11,40 @@ from .common import JSON, RosterType, dig
 
 # Team fields tried, in order, for an exact (case-insensitive) match.
 _EXACT_MATCH_FIELDS = ("abbreviation", "name", "teamName", "clubName", "shortName")
+
+
+# --------------------------------------------------------------- result types --
+
+
+class Team(TypedDict):
+    id: int
+    name: str | None
+    abbreviation: str | None
+    league: str | None
+    division: str | None
+    venue: str | None
+
+
+class TeamList(TypedDict):
+    """Every MLB team, sorted by name."""
+
+    count: int
+    teams: list[Team]
+
+
+class RosterPlayer(TypedDict):
+    player_id: int | None
+    name: str | None
+    jersey: str | None
+    position: str | None
+    status: str | None
+
+
+class Roster(TypedDict):
+    team: str
+    roster_type: RosterType
+    count: int
+    players: list[RosterPlayer]
 
 
 async def _all_teams(hydrate: str | None = None) -> list[JSON]:
@@ -45,7 +80,7 @@ async def resolve_team(team: str) -> JSON:
     raise ToolError(f"No MLB team matches '{team}'. Call list_teams to see valid teams.")
 
 
-def _format_team(team: JSON) -> JSON:
+def _format_team(team: JSON) -> Team:
     return {
         "id": team["id"],
         "name": team.get("name"),
@@ -56,7 +91,7 @@ def _format_team(team: JSON) -> JSON:
     }
 
 
-def _format_roster_entry(entry: JSON) -> JSON:
+def _format_roster_entry(entry: JSON) -> RosterPlayer:
     return {
         "player_id": dig(entry, "person", "id"),
         "name": dig(entry, "person", "fullName"),
@@ -66,17 +101,18 @@ def _format_roster_entry(entry: JSON) -> JSON:
     }
 
 
-async def list_teams() -> list[JSON]:
+async def list_teams() -> TeamList:
     """List all 30 MLB teams with their ids, abbreviations, league, division and ballpark."""
     teams = await _all_teams(hydrate="league,division")
-    return [_format_team(t) for t in sorted(teams, key=lambda t: t.get("name", ""))]
+    formatted = [_format_team(t) for t in sorted(teams, key=lambda t: t.get("name", ""))]
+    return {"count": len(formatted), "teams": formatted}
 
 
 async def get_team_roster(
     team: str,
     roster_type: RosterType = "active",
     season: int | None = None,
-) -> JSON:
+) -> Roster:
     """Get a team's roster.
 
     Args:

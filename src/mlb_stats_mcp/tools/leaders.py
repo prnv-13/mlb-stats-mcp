@@ -3,13 +3,32 @@
 from __future__ import annotations
 
 from mcp.server.mcpserver.exceptions import ToolError
+from typing_extensions import TypedDict
 
 from ..config import League, Limits, MLBApi
 from ..mlb import endpoints, get_client
 from .common import JSON, LeagueCode, StatGroup, clamp, current_season, dig, season_cache_ttl
 
 
-def _format_leader(entry: JSON) -> JSON:
+class Leader(TypedDict):
+    rank: int | None
+    player_id: int | None
+    name: str | None
+    team: str | None
+    value: str | None  # formatted by MLB, e.g. "58" or ".331"
+
+
+class LeaderBoard(TypedDict):
+    """The top players in one stat category, best first. Tied players share a rank."""
+
+    category: str | None
+    group: str | None
+    season: int
+    league: LeagueCode
+    leaders: list[Leader]
+
+
+def _format_leader(entry: JSON) -> Leader:
     return {
         "rank": entry.get("rank"),
         "player_id": dig(entry, "person", "id"),
@@ -31,7 +50,7 @@ async def get_league_leaders(
     group: StatGroup | None = None,
     league: LeagueCode = "MLB",
     limit: int = Limits.DEFAULT_LEADERS,
-) -> JSON:
+) -> LeaderBoard:
     """Get the league leaders for a statistic.
 
     Args:

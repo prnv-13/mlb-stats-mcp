@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from mcp.server.mcpserver.exceptions import ToolError
+from typing_extensions import NotRequired, TypedDict
 
 from ..config import CacheTTL, Limits, MLBApi
 from ..mlb import endpoints, get_client
@@ -10,6 +13,7 @@ from .common import (
     JSON,
     HittingOrPitching,
     StatGroup,
+    Stats,
     StatType,
     clamp,
     current_season,
@@ -30,10 +34,86 @@ GAME_LOG_FIELDS: dict[str, tuple[str, ...]] = {
 }  # fmt: skip
 
 
+# --------------------------------------------------------------- result types --
+
+
+class PlayerMatch(TypedDict):
+    player_id: int
+    name: str | None
+    position: str | None
+    current_team: str | None
+    active: bool | None
+    mlb_debut: str | None
+
+
+class PlayerSearch(TypedDict):
+    """Players whose name matches the search."""
+
+    count: int
+    players: list[PlayerMatch]
+    note: NotRequired[str]
+
+
+class PlayerBio(TypedDict):
+    player_id: int
+    name: str | None
+    current_team: str | None
+    position: str | None
+    jersey: str | None
+    age: int | None
+    birth_date: str | None
+    birthplace: str
+    height: str | None
+    weight_lbs: int | None
+    bats: str | None
+    throws: str | None
+    mlb_debut: str | None
+    active: bool | None
+
+
+class StatLine(TypedDict):
+    """One season or career line. A player traded mid-season has one line per team."""
+
+    season: str | None
+    team: str | None
+    league: str | None
+    stats: Stats
+
+
+class PlayerStats(TypedDict):
+    player_id: int
+    group: StatGroup
+    stat_type: StatType
+    splits: list[StatLine]
+    season: NotRequired[int]
+    note: NotRequired[str]
+
+
+class GameLogEntry(TypedDict):
+    date: str | None
+    opponent: str | None
+    home_away: Literal["home", "away"]
+    team_result: Literal["W", "L"]
+    game_pk: int | None
+    summary: str | None
+    stats: Stats
+
+
+class GameLog(TypedDict):
+    """A player's games, most recent first."""
+
+    player_id: int
+    group: HittingOrPitching
+    season: int
+    games_played_in_season: int
+    games: list[GameLogEntry]
+    note: NotRequired[str]
+
+
 # ----------------------------------------------------------------- formatting --
 
 
-def _format_search_result(person: JSON, current_team: str | None) -> JSON:
+def _format_search_result(person: JSON, current_team: str | None) -> PlayerMatch:
     return {
         "player_id": person["id"],
         "name": person.get("fullName"),
@@ -44,7 +124,7 @@ def _format_search_result(person: JSON, current_team: str | None) -> JSON:
     }
 
 
-def _format_bio(person: JSON) -> JSON:
+def _format_bio(person: JSON) -> PlayerBio:
     birthplace_parts = (
         person.get("birthCity"),
         person.get("birthStateProvince"),
@@ -68,7 +148,7 @@ def _format_bio(person: JSON) -> JSON:
     }
 
 
-def _format_stat_split(split: JSON) -> JSON:
+def _format_stat_split(split: JSON) -> StatLine:
     stats = split.get("stat") or {}
     return {
         "season": split.get("season"),
@@ -78,7 +158,7 @@ def _format_stat_split(split: JSON) -> JSON:
     }
 
 
-def _format_game_log_entry(split: JSON, fields: tuple[str, ...]) -> JSON:
+def _format_game_log_entry(split: JSON, fields: tuple[str, ...]) -> GameLogEntry:
     stats = split.get("stat") or {}
     return {
         "date": split.get("date"),
@@ -103,7 +183,7 @@ def _game_order(split: JSON) -> tuple[str, int]:
 # ---------------------------------------------------------------------- tools --
 
 
-async def search_players(name: str, active_only: bool = False) -> list[JSON]:
+async def search_players(name: str, active_only: bool = False) -> PlayerSearch:
     """Find MLB players by name and return their player_id (needed by other player tools).
 
     Args:
@@ -122,7 +202,7 @@ async def search_players(name: str, active_only: bool = False) -> list[JSON]:
     )
     people = search.get("people", [])[: Limits.MAX_SEARCH_RESULTS]
     if not people:
-        return []
+        return {"count": 0, "players": [], "note": f"No MLB players match '{name}'."}
 
     # Search results omit the current team, so fetch it for all matches in one request.
     details = await client.get(
@@ -131,10 +211,11 @@ async def search_players(name: str, active_only: bool = False) -> list[JSON]:
         ttl=CacheTTL.ROSTER,
     )
     team_by_player = {p["id"]: dig(p, "currentTeam", "name") for p in details.get("people", [])}
-    return [_format_search_result(p, team_by_player.get(p["id"])) for p in people]
+    players = [_format_search_result(p, team_by_player.get(p["id"])) for p in people]
+    return {"count": len(players), "players": players}
 
 
-async def get_player_info(player_id: int) -> JSON:
+async def get_player_info(player_id: int) -> PlayerBio:
     """Get a player's biography: team, position, age, height, handedness, debut, birthplace.
 
     Args:
@@ -154,7 +235,7 @@ async def get_player_stats(
     group: StatGroup = "hitting",
     stat_type: StatType = "season",
     season: int | None = None,
-) -> JSON:
+) -> PlayerStats:
     """Get a player's batting, pitching or fielding stats.
 
     Args:
@@ -174,7 +255,12 @@ async def get_player_stats(
     )
     splits = [_format_stat_split(split) for split in _all_splits(data)]
 
-    result: JSON = {"player_id": player_id, "group": group, "stat_type": stat_type, "splits": splits}
+    result: PlayerStats = {
+        "player_id": player_id,
+        "group": group,
+        "stat_type": stat_type,
+        "splits": splits,
+    }
     if is_single_season:
         result["season"] = season
     if not splits:
@@ -192,7 +278,7 @@ async def get_player_game_log(
     group: HittingOrPitching = "hitting",
     season: int | None = None,
     last_n: int = Limits.DEFAULT_GAME_LOG_GAMES,
-) -> JSON:
+) -> GameLog:
     """Get a player's game-by-game stats, most recent game first. Use for recent form, hot or
     cold streaks, and "how did he do last night / this week" questions.
 
@@ -211,7 +297,7 @@ async def get_player_game_log(
     games = sorted(_all_splits(data), key=_game_order, reverse=True)
     recent = games[: clamp(last_n, 1, Limits.MAX_GAME_LOG_GAMES)]
 
-    result: JSON = {
+    result: GameLog = {
         "player_id": player_id,
         "group": group,
         "season": season,

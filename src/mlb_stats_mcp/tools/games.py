@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing_extensions import NotRequired, TypedDict
+
 from ..config import CacheTTL, MLBApi
 from ..mlb import endpoints, get_client
 from .common import JSON, dig, today
@@ -12,10 +14,91 @@ SIDES = ("away", "home")
 LINE_SCORE_TOTALS = ("runs", "hits", "errors")
 
 
+# --------------------------------------------------------------- result types --
+
+
+class ScheduledTeam(TypedDict):
+    team: str | None
+    score: int | None
+    record: str | None  # wins-losses, e.g. "92-70"
+    probable_pitcher: str | None
+
+
+class ScheduledGame(TypedDict):
+    game_pk: int | None
+    date: str | None
+    start_time_utc: str | None
+    status: str | None
+    game_type: str | None
+    series: str | None
+    venue: str | None
+    away: ScheduledTeam
+    home: ScheduledTeam
+
+
+# "from" is a Python keyword, so the window's keys need TypedDict's functional form.
+_ScheduleWindow = TypedDict("_ScheduleWindow", {"from": str, "to": str})
+
+
+class Schedule(_ScheduleWindow):
+    """Games from one date to another, inclusive."""
+
+    count: int
+    games: list[ScheduledGame]
+    note: NotRequired[str]
+
+
+class GameState(TypedDict):
+    inning: str | None  # e.g. "7th"
+    half: str | None  # "Top" or "Bottom"
+    outs: int | None
+
+
+class TeamTotals(TypedDict):
+    runs: int | None
+    hits: int | None
+    errors: int | None
+
+
+class GameTotals(TypedDict):
+    away: TeamTotals
+    home: TeamTotals
+
+
+class InningRuns(TypedDict):
+    inning: int | None
+    away: int | None
+    home: int | None
+
+
+class BoxScoreLine(TypedDict):
+    name: str | None
+    position: str | None
+    line: str | None  # MLB's one-line summary, e.g. "2-4 | HR, 2 RBI"
+
+
+class TeamBoxScore(TypedDict):
+    team: str | None
+    batters: list[BoxScoreLine]
+    pitchers: list[BoxScoreLine]
+
+
+class Game(TypedDict):
+    """A game's line score and box score, live or final."""
+
+    game_pk: int
+    status: str | None
+    state: GameState
+    totals: GameTotals
+    innings: list[InningRuns]
+    away: TeamBoxScore
+    home: TeamBoxScore
+
+
 # ----------------------------------------------------------------- formatting --
 
 
-def _format_schedule_side(side: JSON) -> JSON:
+def _format_schedule_side(side: JSON) -> ScheduledTeam:
     record = side.get("leagueRecord") or {}
     return {
         "team": dig(side, "team", "name"),
@@ -25,7 +108,7 @@ def _format_schedule_side(side: JSON) -> JSON:
     }
 
 
-def _format_scheduled_game(game: JSON) -> JSON:
+def _format_scheduled_game(game: JSON) -> ScheduledGame:
     return {
         "game_pk": game.get("gamePk"),
         "date": game.get("officialDate"),
@@ -38,7 +121,7 @@ def _format_scheduled_game(game: JSON) -> JSON:
     }
 
 
-def _format_player_line(player: JSON, stat_group: str) -> JSON | None:
+def _format_player_line(player: JSON, stat_group: str) -> BoxScoreLine | None:
     """One box-score row, or None if the player has no stats in this group."""
     stats = dig(player, "stats", stat_group)
     if not stats:
@@ -50,10 +133,10 @@ def _format_player_line(player: JSON, stat_group: str) -> JSON | None:
     }
 
 
-def _format_team_box(team_box: JSON) -> JSON:
+def _format_team_box(team_box: JSON) -> TeamBoxScore:
     players = team_box.get("players", {})
 
-    def lines(player_ids: list[int], stat_group: str) -> list[JSON]:
+    def lines(player_ids: list[int], stat_group: str) -> list[BoxScoreLine]:
         # The box score keys each player as "ID<player id>".
         rows = (_format_player_line(players.get(f"ID{pid}", {}), stat_group) for pid in player_ids)
         return [row for row in rows if row]
@@ -65,7 +148,7 @@ def _format_team_box(team_box: JSON) -> JSON:
     }
 
 
-def _format_inning(inning: JSON) -> JSON:
+def _format_inning(inning: JSON) -> InningRuns:
     return {
         "inning": inning.get("num"),
         **{side: dig(inning, side, "runs") for side in SIDES},
@@ -91,7 +174,7 @@ async def get_schedule(
     date: str | None = None,
     end_date: str | None = None,
     team: str | None = None,
-) -> JSON:
+) -> Schedule:
     """Get MLB games (with scores and probable pitchers) for a date or date range.
 
     Args:
@@ -118,13 +201,13 @@ async def get_schedule(
     )
     games = [_format_scheduled_game(game) for game in _games_in(schedule)]
 
-    result: JSON = {"from": start, "to": last_day, "count": len(games), "games": games}
+    result: Schedule = {"from": start, "to": last_day, "count": len(games), "games": games}
     if not games:
         result["note"] = "No games scheduled in this window (it may be the off-season or an off day)."
     return result
 
 
-async def get_game(game_pk: int) -> JSON:
+async def get_game(game_pk: int) -> Game:
     """Get a game's live or final line score plus each team's batting and pitching box score.
 
     Args:

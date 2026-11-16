@@ -6,10 +6,19 @@ from collections.abc import Iterable
 from typing import Any, Literal
 
 from mcp.server.mcpserver.exceptions import ToolError
+from typing_extensions import NotRequired, TypedDict
 
 from ..config import CacheTTL, GameType, Limits, Matchups
 from ..mlb import endpoints, get_client
-from .common import JSON, HittingOrPitching, SeasonOrCareer, current_season, dig, season_cache_ttl
+from .common import (
+    JSON,
+    HittingOrPitching,
+    SeasonOrCareer,
+    Stats,
+    current_season,
+    dig,
+    season_cache_ttl,
+)
 
 Better = Literal["higher", "lower"]
 
@@ -41,6 +50,50 @@ CAREER_TOTALS_BLOCK = "vsPlayerTotal"
 BY_SEASON_BLOCK = "vsPlayer"
 
 
+# --------------------------------------------------------------- result types --
+
+
+class PlayerRef(TypedDict):
+    player_id: int
+    name: str | None
+
+
+class MatchupSeason(TypedDict):
+    season: str | None
+    game_type: str  # regular_season, wild_card, division_series, ...
+    batter_team: str | None
+    pitcher_team: str | None
+    stats: Stats
+
+
+class Matchup(TypedDict):
+    """A batter's history against one pitcher."""
+
+    batter: PlayerRef
+    pitcher: PlayerRef
+    career_totals: dict[str, Stats]  # keyed by game type, like MatchupSeason.game_type
+    by_season: list[MatchupSeason]  # newest first
+    note: NotRequired[str]
+
+
+class ComparedPlayer(PlayerRef):
+    position: str | None
+    current_team: str | None
+    stats: Stats
+    played_for: NotRequired[list[str]]  # single-season comparisons only
+
+
+class Comparison(TypedDict):
+    """Players side by side; leaders maps each ranked stat to its leader's name, or "tie"."""
+
+    group: HittingOrPitching
+    stat_type: SeasonOrCareer
+    season: int | None
+    players: list[ComparedPlayer]
+    leaders: dict[str, str]
+    note: NotRequired[str]
+
+
 # ------------------------------------------------------------------- helpers --
 
 
@@ -58,7 +111,7 @@ async def _people_by_id(player_ids: list[int], hydrate: str, ttl: int) -> dict[i
     return found
 
 
-def _player_ref(person: JSON) -> JSON:
+def _player_ref(person: JSON) -> PlayerRef:
     return {"player_id": person["id"], "name": person.get("fullName")}
 
 
@@ -89,7 +142,7 @@ def _game_type_name(split: JSON) -> str:
     return GameType.NAMES.get(code, code)
 
 
-def _format_matchup_season(split: JSON) -> JSON:
+def _format_matchup_season(split: JSON) -> MatchupSeason:
     return {
         "season": split.get("season"),
         "game_type": _game_type_name(split),
@@ -99,7 +152,7 @@ def _format_matchup_season(split: JSON) -> JSON:
     }
 
 
-def _matchup_note(totals: dict[str, JSON]) -> str | None:
+def _matchup_note(totals: dict[str, Stats]) -> str | None:
     regular_season = totals.get(GameType.NAMES[GameType.REGULAR_SEASON], {})
     plate_appearances = sum(t.get("plateAppearances", 0) for t in totals.values())
     if not plate_appearances:
@@ -112,7 +165,7 @@ def _matchup_note(totals: dict[str, JSON]) -> str | None:
     return None
 
 
-async def get_matchup(batter_id: int, pitcher_id: int, include_postseason: bool = False) -> JSON:
+async def get_matchup(batter_id: int, pitcher_id: int, include_postseason: bool = False) -> Matchup:
     """Get a batter's career history against one pitcher: plate appearances, hits, home runs,
     walks, strikeouts and AVG/OBP/SLG/OPS, in total and by season. Use for "how does X hit
     against Y?" and pitching or lineup matchup questions.
@@ -150,7 +203,7 @@ async def get_matchup(batter_id: int, pitcher_id: int, include_postseason: bool 
         reverse=True,
     )
 
-    result: JSON = {
+    result: Matchup = {
         "batter": _player_ref(people[batter_id]),
         "pitcher": _player_ref(people[pitcher_id]),
         "career_totals": totals,
@@ -185,19 +238,21 @@ def _overall_split(splits: list[JSON]) -> JSON | None:
 
 def _format_compared_player(
     person: JSON, group: HittingOrPitching, stat_type: SeasonOrCareer
-) -> JSON:
+) -> ComparedPlayer:
     splits = _stat_splits(person)
     overall = _overall_split(splits)
-    row = _player_ref(person)
-    row["position"] = dig(person, "primaryPosition", "abbreviation")
-    row["current_team"] = dig(person, "currentTeam", "name")
+    row: ComparedPlayer = {
+        **_player_ref(person),
+        "position": dig(person, "primaryPosition", "abbreviation"),
+        "current_team": dig(person, "currentTeam", "name"),
+        "stats": _pick(overall.get("stat") or {}, COMPARE_FIELDS[group]) if overall else {},
+    }
     if stat_type == "season":
-        row["played_for"] = [dig(split, "team", "name") for split in splits if split.get("team")]
-    row["stats"] = _pick(overall.get("stat") or {}, COMPARE_FIELDS[group]) if overall else {}
+        row["played_for"] = [team for split in splits if (team := dig(split, "team", "name"))]
     return row
 
 
-def _leaders(players: list[JSON], group: HittingOrPitching) -> dict[str, str]:
+def _leaders(players: list[ComparedPlayer], group: HittingOrPitching) -> dict[str, str]:
     """For each stat with a better direction, the player who leads it ("tie" if shared)."""
     leaders = {}
     for stat, better in COMPARE_FIELDS[group].items():
@@ -218,7 +273,7 @@ async def compare_players(
     group: HittingOrPitching = "hitting",
     stat_type: SeasonOrCareer = "season",
     season: int | None = None,
-) -> JSON:
+) -> Comparison:
     """Compare 2-5 players side by side for one season or their careers, and say who leads
     each stat (e.g. OPS, home runs, ERA, WHIP). Use for "who's better, X or Y?" questions.
 
@@ -244,7 +299,7 @@ async def compare_players(
         ttl=season_cache_ttl(season) if is_single_season else CacheTTL.CURRENT_SEASON,
     )
     players = [_format_compared_player(found[pid], group, stat_type) for pid in unique_ids]
-    result: JSON = {
+    result: Comparison = {
         "group": group,
         "stat_type": stat_type,
         "season": season if is_single_season else None,
