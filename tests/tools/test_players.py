@@ -83,7 +83,10 @@ async def test_season_stats_include_advanced_stats(fake_mlb, call_tool):
     assert [s["stats"] for s in result.data["splits"]] == [{"homeRuns": 40}]
     advanced = {"war": 8.123, "wRcPlus": 180.4, "xba": ".300", "xslg": ".650"}
     assert result.data["advanced"] == advanced
-    assert fake.requests[0].url.params["stats"] == "season,sabermetrics,expectedStatistics"
+    assert "pitch_mix" not in result.data  # pitchers only
+    params = fake.requests[0].url.params
+    assert params["stats"] == "season,sabermetrics,expectedStatistics"
+    assert "metrics" not in params
 
 
 @pytest.mark.parametrize(
@@ -97,6 +100,64 @@ async def test_advanced_stats_are_only_for_seasons_of_hitting_or_pitching(
     result = await call_tool("get_player_stats", {"player_id": 1, **arguments})
     assert "advanced" not in result.data
     assert fake.requests[0].url.params["stats"] == requested
+
+
+def _arsenal_row(code: str, description: str, share: float, speed: float) -> dict:
+    stat = {"type": {"code": code, "description": description}, "percentage": share}
+    return {"stat": {**stat, "count": round(share * 1000), "averageSpeed": speed}}
+
+
+def _metric_row(code: str, metric: str, value: float) -> dict:
+    event = {"details": {"type": {"code": code}}}
+    return {"stat": {"metric": {"name": metric, "averageValue": value}, "event": event}}
+
+
+async def test_pitching_season_includes_pitch_mix_most_used_first(fake_mlb, call_tool):
+    response = {
+        "stats": [
+            _block("season", [{"season": "2026", "stat": {"era": "2.50"}}]),
+            _block(
+                "pitchArsenal",
+                [
+                    _arsenal_row("CU", "Curveball", 0.0501, 80.44),
+                    _arsenal_row("FF", "Four-seam FB", 0.3803, 96.789),
+                ],
+            ),
+            _block(
+                "metricAverages",
+                [
+                    _metric_row("FF", "releaseSpinRate", 2332.4),
+                    _metric_row("FF", "releaseSpeed", 96.8),  # not spin: ignored
+                ],
+            ),
+        ]
+    }
+    fake = fake_mlb(lambda r: httpx.Response(200, json=response))
+    result = await call_tool(
+        "get_player_stats", {"player_id": 1, "group": "pitching", "season": 2026}
+    )
+
+    assert result.data["pitch_mix"] == [
+        {
+            "pitch": "Four-seam FB",
+            "code": "FF",
+            "usage_pct": 38.0,
+            "count": 380,
+            "avg_speed_mph": 96.8,
+            "avg_spin_rpm": 2332,
+        },
+        {
+            "pitch": "Curveball",
+            "code": "CU",
+            "usage_pct": 5.0,
+            "count": 50,
+            "avg_speed_mph": 80.4,
+            "avg_spin_rpm": None,  # no spin reported for this pitch
+        },
+    ]
+    params = fake.requests[0].url.params
+    assert params["stats"] == "season,sabermetrics,expectedStatistics,pitchArsenal,metricAverages"
+    assert params["metrics"] == "releaseSpinRate"  # MLB fails without it
 
 
 def _situation_row(code: str, team: str | None = None, **stats) -> dict:
@@ -124,7 +185,7 @@ async def test_split_returns_one_line_per_situation_in_order(fake_mlb, call_tool
         ("vs_right", ".839"),
     ]
     assert data["split"] == "handedness"
-    assert "advanced" not in data
+    assert "advanced" not in data and "pitch_mix" not in data
     params = fake.requests[0].url.params
     assert params["stats"] == "statSplits" and params["sitCodes"] == "vl,vr"
     assert params["season"] == "2026"

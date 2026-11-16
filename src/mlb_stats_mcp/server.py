@@ -18,9 +18,9 @@ INSTRUCTIONS = (
     "if the current one has no data. In the off-season, get_free_agents ranks who is still "
     "available (or who signed where), get_transactions covers signings and trades, and "
     "get_award_winners covers MVP, Cy Young, other awards and the Hall of Fame. For a single "
-    "season, get_player_stats and compare_players include WAR, wRC+, FIP and expected stats. "
-    "For situational questions (vs lefties, home or away, with runners in scoring position) "
-    "pass get_player_stats a split. "
+    "season, get_player_stats and compare_players include WAR, wRC+, FIP and expected stats, "
+    "and get_player_stats adds a pitcher's pitch mix. For situational questions (vs lefties, "
+    "home or away, with runners in scoring position) pass get_player_stats a split. "
     "Dates are YYYY-MM-DD."
 )
 

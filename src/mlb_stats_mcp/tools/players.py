@@ -9,7 +9,7 @@ from typing_extensions import NotRequired, TypedDict
 
 from ..config import CacheTTL, Limits, MLBApi, Splits
 from ..mlb import endpoints, get_client
-from . import advanced
+from . import advanced, pitch_mix
 from .common import (
     JSON,
     HittingOrPitching,
@@ -24,6 +24,7 @@ from .common import (
     season_cache_ttl,
     stat_blocks,
 )
+from .pitch_mix import Pitch
 
 # Key stats kept per game in a game log (the API returns ~40 per game).
 GAME_LOG_FIELDS: dict[str, tuple[str, ...]] = {
@@ -97,6 +98,7 @@ class PlayerStats(TypedDict):
     season: NotRequired[int]
     split: NotRequired[SplitCategory]
     advanced: NotRequired[Stats]  # single seasons of hitting or pitching only
+    pitch_mix: NotRequired[list[Pitch]]  # single seasons of pitching only, most used first
     note: NotRequired[str]
 
 
@@ -256,6 +258,7 @@ async def get_player_stats(
     """Get a player's batting, pitching or fielding stats. For one season of hitting or
     pitching it also returns advanced stats: WAR, wRC+, wOBA, FIP, xFIP, ERA-/FIP- and the
     Statcast expected stats xBA, xSLG and xwOBA (for pitchers, what hitters did against them).
+    One season of pitching also returns the pitch mix: each pitch's usage, speed and spin.
 
     Use split for situational questions such as "how does he hit lefties?", "home or away?"
     or "with runners in scoring position".
@@ -278,12 +281,15 @@ async def get_player_stats(
     is_single_season = stat_type == "season"
     if is_single_season:
         season = season or current_season()
-    # Advanced stats are separate stats types, fetched in the same request.
+    # Advanced stats and the pitch mix are separate stats types, fetched in the same request.
     with_extras = is_single_season and not split
     with_advanced = with_extras and group in advanced.FIELDS
+    with_pitch_mix = with_extras and group == "pitching"
     stat_types = (SPLIT_STAT_TYPES[stat_type] if split else stat_type,)
     if with_advanced:
         stat_types += advanced.STAT_TYPES
+    if with_pitch_mix:
+        stat_types += pitch_mix.STAT_TYPES
 
     data = await get_client().get(
         endpoints.person_stats(player_id),
@@ -292,6 +298,7 @@ async def get_player_stats(
             "group": group,
             "season": season if is_single_season else None,
             "sitCodes": ",".join(Splits.CATEGORIES[split]) if split else None,
+            "metrics": pitch_mix.SPIN_METRIC if with_pitch_mix else None,
         },
         ttl=season_cache_ttl(season) if is_single_season else CacheTTL.CURRENT_SEASON,
     )
@@ -315,6 +322,8 @@ async def get_player_stats(
         result["split"] = split
     if with_advanced and (advanced_stats := advanced.pick_advanced(blocks, group)):
         result["advanced"] = advanced_stats
+    if with_pitch_mix and (pitches := pitch_mix.pick_pitch_mix(blocks)):
+        result["pitch_mix"] = pitches
     if not lines:
         found = f"{group} {split} splits" if split else f"{group} stats"
         result["note"] = (
