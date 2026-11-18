@@ -1,0 +1,40 @@
+name: Release
+
+# Pushing a tag like v0.2.0 tests, builds and publishes that version to PyPI.
+# PyPI trusts this workflow directly (Trusted Publishing), so no API token is stored anywhere.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  pypi:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/mlb-stats-mcp/
+    permissions:
+      contents: read
+      id-token: write # lets PyPI verify this workflow instead of a token
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: false # never build a release from a cache
+      - name: Check the tag matches the version in pyproject.toml
+        run: |
+          version="$(uv version --short)"
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} doesn't match version ${version} in pyproject.toml"
+            exit 1
+          fi
+      - run: uv run --locked pytest -q
+      - run: uv build
+      # --check-url skips files already on PyPI, so a re-run after a partial upload succeeds.
+      - run: uv publish --check-url https://pypi.org/simple/

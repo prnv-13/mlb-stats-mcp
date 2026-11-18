@@ -1,5 +1,7 @@
 # MLB Stats MCP
 
+[![CI](https://github.com/prnv-13/mlb-stats-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/prnv-13/mlb-stats-mcp/actions/workflows/ci.yml)
+
 An [MCP](https://modelcontextprotocol.io) server that gives Claude (or any MCP client) live and
 historical Major League Baseball data: players, season, career and advanced stats (WAR, wRC+,
 FIP, expected stats), schedules, live box scores, standings, leaders, free agents, the draft
@@ -115,6 +117,7 @@ cd mlb-stats-mcp
 uv sync
 
 uv run pytest                                # offline unit tests (MLB API is faked)
+uvx ruff check src tests scripts             # lint; CI runs this and the tests on Python 3.10-3.14
 uv run scripts/smoke_test.py                 # calls every tool over stdio against the live API
 uv run mlb-stats-mcp --transport http        # serves http://127.0.0.1:8000/mcp
 npx @modelcontextprotocol/inspector          # GUI for poking at tools
@@ -160,25 +163,35 @@ There are two ways people can use your MCP. You can do both.
 
 ### 1. Publish a package so anyone can run `uvx mlb-stats-mcp`
 
-1. Create accounts on [pypi.org](https://pypi.org) and [test.pypi.org](https://test.pypi.org), then
-   create an API token on each (Account settings → API tokens).
-2. Build:
-   ```bash
-   uv build            # creates dist/*.whl and dist/*.tar.gz
-   ```
-3. Do a test run on TestPyPI:
-   ```bash
-   uv publish --publish-url https://test.pypi.org/legacy/ --token pypi-XXXX
-   uvx --index-url https://test.pypi.org/simple/ --index-strategy unsafe-best-match mlb-stats-mcp --help
-   ```
-4. Publish for real:
-   ```bash
-   uv publish --token pypi-XXXX
-   ```
-5. For each new release, bump `version` in `pyproject.toml`, run `uv build`, then `uv publish`.
+Releases are published by the
+[Release workflow](https://github.com/prnv-13/mlb-stats-mcp/blob/main/.github/workflows/release.yml)
+when you push a version tag. It uses PyPI
+[Trusted Publishing](https://docs.pypi.org/trusted-publishers/), so no API token is stored anywhere.
 
-To skip handling tokens, set up [Trusted Publishing](https://docs.pypi.org/trusted-publishers/)
-on PyPI and publish from a GitHub Action instead.
+**One-time setup.** On pypi.org, go to Account settings → Publishing → Add a new pending publisher
+→ GitHub, and enter:
+
+| Field | Value |
+|---|---|
+| PyPI project name | `mlb-stats-mcp` |
+| Owner | `prnv-13` |
+| Repository name | `mlb-stats-mcp` |
+| Workflow name | `release.yml` |
+| Environment name | `pypi` |
+
+**Each release.** Bump the version, commit, and push a matching tag. The workflow checks that the
+tag matches `pyproject.toml`, runs the tests, builds and publishes. PyPI accepts each version only
+once.
+
+```bash
+uv version --bump patch                      # or minor / major; updates pyproject.toml and uv.lock
+git commit -am "Release v$(uv version --short)"
+git tag "v$(uv version --short)"
+git push origin main "v$(uv version --short)"
+```
+
+To publish by hand instead, run `uv build`, then `uv publish` and paste a PyPI API token when
+asked.
 
 ### 2. Host it so people only need a URL
 
